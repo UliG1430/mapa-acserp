@@ -1,0 +1,20 @@
+/* Generado por tools/build-assets.py — no editar a mano.
+   Color de marca de cada organo, muestreado de su logo redondo. */
+:root{
+  --c-acnur: #1e2dbe;
+  --c-ag: #ea1d2d;
+  --c-caj: #4a4849;
+  --c-cdh: #f36e24;
+  --c-cs: #e01a83;
+  --c-ecosoc: #40ae48;
+  --c-minulp: #0e0e3f;
+  --c-oit: #810026;
+  --c-oms: #fdb714;
+  --c-onudd: #06402a;
+  --c-onum: #7e0c97;
+  --c-pnuma: #00bda1;
+  --c-sti: #0083ca;
+  --c-unesco: #96370e;
+  --c-unicef: #ef796b;
+  --c-unoda: #000000;
+}

@@ -1,0 +1,23 @@
+{
+  "name": "MINULP 2026 — Mapa y cronograma",
+  "short_name": "MINULP 2026",
+  "description": "Mapa en tiempo real y cronograma del Modelo Intercolegial de Naciones Unidas de La Plata 2026, en la República de los Niños.",
+  "lang": "es-AR",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0e0e3f",
+  "theme_color": "#0e0e3f",
+  "categories": ["education", "navigation", "utilities"],
+  "icons": [
+    { "src": "img/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "img/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "img/icons/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Cronograma", "url": "./#cronograma" },
+    { "name": "Buscar un lugar", "url": "./#buscar" }
+  ]
+}

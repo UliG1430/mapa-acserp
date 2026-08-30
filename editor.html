@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Editor de puntos — MINULP 2026</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/marcas.css">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  .ed-cab { background: #3b1d5e; }
+  .mapa-caja { min-height: 240px; }
+  .ed-panel {
+    flex: 0 1 auto; max-height: 46vh; overflow-y: auto;
+    border-top: 1px solid var(--borde); background: var(--papel);
+    padding: 12px 14px calc(14px + env(safe-area-inset-bottom));
+  }
+  .ed-fila { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .ed-fila label { font-size: .74rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--tinta-2); }
+  .ed-panel input, .ed-panel select {
+    min-height: 42px; padding: 8px 11px; border: 1px solid var(--borde);
+    border-radius: 10px; background: var(--papel-2); color: var(--tinta);
+  }
+  .ed-panel input[type=text] { flex: 1 1 160px; min-width: 0; }
+  code.salida {
+    display: block; padding: 10px 12px; border-radius: 10px;
+    background: var(--papel-3); font-size: .78rem; line-height: 1.5;
+    white-space: pre-wrap; word-break: break-all; font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .ed-nota { font-size: .8rem; color: var(--tinta-2); }
+  .ed-lista { list-style: none; margin: 8px 0 0; padding: 0; font-size: .84rem; }
+  .ed-lista li { display: flex; gap: 8px; align-items: center; padding: 6px 0;
+    border-bottom: 1px solid var(--borde); }
+  .ed-lista code { flex: 1 1 auto; font-size: .76rem; word-break: break-all; }
+  .ed-lista button { min-height: 32px; padding: 3px 9px; border-radius: 8px;
+    border: 1px solid var(--borde); background: var(--papel-2); cursor: pointer; }
+  .ed-res { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<header class="cabecera ed-cab">
+  <div class="cabecera-txt">
+    <p class="cabecera-titulo">Editor de puntos</p>
+    <p class="cabecera-sub">Herramienta interna · no la difundas con el mapa</p>
+  </div>
+  <a class="chip-perfil" href="index.html"><span>Volver a la app</span></a>
+</header>
+
+<main id="contenido">
+  <section class="vista" id="vista-mapa">
+    <div class="barra-filtros">
+      <div class="filtros" id="filtros"></div>
+      <div class="conmutador" role="group" aria-label="Modo del editor">
+        <button type="button" id="modo-marcar" class="activo">Marcar</button>
+        <button type="button" id="modo-gps">GPS</button>
+      </div>
+    </div>
+    <div class="mapa-caja" id="mapa-caja">
+      <div class="mapa-viewport" id="mapa" tabindex="0" role="application"
+           aria-label="Mapa. Tocá un punto para obtener sus coordenadas."></div>
+      <div class="mapa-controles">
+        <button type="button" id="btn-encuadrar" class="ctrl ctrl-chico" aria-label="Ver todo">⤢</button>
+        <button type="button" id="btn-acercar" class="ctrl" aria-label="Acercar">+</button>
+        <button type="button" id="btn-alejar" class="ctrl" aria-label="Alejar">−</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="ed-panel">
+  <div id="panel-marcar">
+    <p class="ed-nota">Tocá el mapa donde va el punto. Después completá el nombre y copiá la línea a
+      <code>js/datos.js</code>.</p>
+    <div class="ed-fila">
+      <input type="text" id="ed-nombre" placeholder="Nombre del lugar" autocomplete="off">
+      <select id="ed-tipo" aria-label="Tipo de lugar"></select>
+      <button type="button" class="btn-pri" id="ed-agregar" style="flex:0 0 auto">Agregar</button>
+    </div>
+    <code class="salida" id="ed-salida">Todavía no tocaste el mapa.</code>
+    <div class="ed-fila" style="margin-top:10px">
+      <button type="button" class="btn-sec" id="ed-copiar">Copiar línea</button>
+      <button type="button" class="btn-sec" id="ed-descargar">Descargar los agregados</button>
+    </div>
+    <ul class="ed-lista" id="ed-lista"></ul>
+  </div>
+
+  <div id="panel-gps" hidden>
+    <p class="ed-nota">Caminá por el predio con esto abierto. Muestra dónde te ubica la app y a qué
+      distancia real quedan los puntos cargados. Si algo cae corrido, anotá el desvío y ajustá
+      <code>tools/calibrar.py</code>.</p>
+    <div class="ed-fila">
+      <button type="button" class="btn-pri" id="gps-prender" style="flex:0 0 auto">Prender GPS</button>
+      <span class="ed-nota" id="gps-estado">Apagado.</span>
+    </div>
+    <code class="salida ed-res" id="gps-datos">—</code>
+  </div>
+</div>
+
+<script type="module">
+import { LUGARES } from './js/datos.js';
+import { crearMapa, TIPOS, GRUPOS } from './js/mapa.js';
+import * as geo from './js/geo.js';
+
+const $ = (s) => document.querySelector(s);
+let ultimo = null;
+const agregados = [];
+
+const mapa = crearMapa($('#mapa'), {
+  alTocarMapa(fx, fy) {
+    if ($('#panel-gps').hidden === false) return;
+    ultimo = { x: Math.max(0, Math.min(1, fx)), y: Math.max(0, Math.min(1, fy)) };
+    pintarSalida();
+  },
+});
+
+$('#btn-acercar').addEventListener('click', () => mapa.acercar());
+$('#btn-alejar').addEventListener('click', () => mapa.alejar());
+$('#btn-encuadrar').addEventListener('click', () => mapa.encuadrar());
+
+$('#filtros').innerHTML = GRUPOS.map((g) =>
+  `<button type="button" class="filtro" data-g="${g.id}" aria-pressed="true">${g.etiqueta}</button>`).join('');
+$('#filtros').addEventListener('click', (e) => {
+  const b = e.target.closest('.filtro');
+  if (!b) return;
+  b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+  mapa.setFiltros([...document.querySelectorAll('.filtro[aria-pressed="true"]')].map((x) => x.dataset.g));
+});
+
+$('#ed-tipo').innerHTML = Object.keys(TIPOS).filter((t) => t !== 'sede')
+  .map((t) => `<option value="${t}">${TIPOS[t].etiqueta}</option>`).join('');
+
+function slug(s) {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'sin-nombre';
+}
+
+function linea() {
+  const n = $('#ed-nombre').value.trim() || 'Sin nombre';
+  const t = $('#ed-tipo').value;
+  return `  { id: '${slug(n)}', nombre: '${n.replace(/'/g, "\\'")}', tipo: '${t}', ` +
+         `x: ${ultimo.x.toFixed(4)}, y: ${ultimo.y.toFixed(4)} },`;
+}
+
+function pintarSalida() {
+  if (!ultimo) return;
+  const c = geo.aLatLon(ultimo.x * geo.MAPA_PX, ultimo.y * geo.MAPA_PX);
+  $('#ed-salida').textContent =
+    linea() + `\n\n// pixel ${Math.round(ultimo.x * geo.MAPA_PX)}, ${Math.round(ultimo.y * geo.MAPA_PX)}` +
+    `   ·   lat ${c.lat.toFixed(6)}, lon ${c.lon.toFixed(6)}` +
+    `   ·   ${geo.dentroDelPredio(c.lat, c.lon) ? 'dentro del predio' : 'FUERA del predio'}`;
+}
+$('#ed-nombre').addEventListener('input', pintarSalida);
+$('#ed-tipo').addEventListener('change', pintarSalida);
+
+$('#ed-copiar').addEventListener('click', async () => {
+  if (!ultimo) return;
+  try { await navigator.clipboard.writeText(linea()); $('#ed-copiar').textContent = 'Copiado'; }
+  catch (e) { $('#ed-copiar').textContent = 'Copiá a mano'; }
+  setTimeout(() => { $('#ed-copiar').textContent = 'Copiar línea'; }, 1600);
+});
+
+$('#ed-agregar').addEventListener('click', () => {
+  if (!ultimo) return;
+  agregados.push(linea());
+  $('#ed-nombre').value = '';
+  pintarLista();
+});
+
+function pintarLista() {
+  $('#ed-lista').innerHTML = agregados.map((l, i) =>
+    `<li><code>${l.trim()}</code><button type="button" data-i="${i}">Quitar</button></li>`).join('');
+}
+$('#ed-lista').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  agregados.splice(Number(b.dataset.i), 1);
+  pintarLista();
+});
+
+$('#ed-descargar').addEventListener('click', () => {
+  const txt = '// Pegar dentro de LUGARES en app/js/datos.js\n' + agregados.join('\n') + '\n';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
+  a.download = 'lugares-nuevos.js';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+
+// ------------------------------------------------------------------ modo GPS
+let parar = null;
+function modo(cual) {
+  const gps = cual === 'gps';
+  $('#panel-gps').hidden = !gps;
+  $('#panel-marcar').hidden = gps;
+  $('#modo-gps').classList.toggle('activo', gps);
+  $('#modo-marcar').classList.toggle('activo', !gps);
+}
+$('#modo-marcar').addEventListener('click', () => modo('marcar'));
+$('#modo-gps').addEventListener('click', () => modo('gps'));
+
+$('#gps-prender').addEventListener('click', () => {
+  if (parar) {
+    parar(); parar = null;
+    $('#gps-prender').textContent = 'Prender GPS';
+    $('#gps-estado').textContent = 'Apagado.';
+    mapa.setUbicacion(null);
+    return;
+  }
+  $('#gps-prender').textContent = 'Apagar GPS';
+  $('#gps-estado').textContent = 'Buscando…';
+  parar = geo.seguirUbicacion((u) => {
+    mapa.setUbicacion(u);
+    $('#gps-estado').textContent = `± ${Math.round(u.precision)} m`;
+    const p = geo.aPixel(u.lat, u.lon);
+    const cerca = LUGARES.map((l) => {
+      const c = geo.aLatLon(l.x * geo.MAPA_PX, l.y * geo.MAPA_PX);
+      return { l, m: geo.distancia(u.lat, u.lon, c.lat, c.lon) };
+    }).sort((a, b) => a.m - b.m).slice(0, 6);
+    $('#gps-datos').textContent =
+      `lat ${u.lat.toFixed(6)}  lon ${u.lon.toFixed(6)}   ± ${Math.round(u.precision)} m\n` +
+      `pixel del dibujo: ${Math.round(p.x)}, ${Math.round(p.y)}   ` +
+      `${geo.dentroDelPredio(u.lat, u.lon) ? '(dentro)' : '(FUERA)'}\n\n` +
+      'lo mas cercano:\n' +
+      cerca.map((c) => `  ${String(Math.round(c.m)).padStart(4)} m   ${c.l.nombre}`).join('\n');
+  }, (e) => {
+    $('#gps-estado').textContent = 'Error: ' + e;
+    parar = null;
+    $('#gps-prender').textContent = 'Prender GPS';
+  });
+});
+</script>
+</body>
+</html>
