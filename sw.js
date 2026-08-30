@@ -3,14 +3,17 @@
 //  Al publicar una version nueva, cambiar VERSION: eso invalida el cache viejo.
 // ============================================================================
 
-const VERSION = 'minulp-2026-v2';
+const VERSION = 'minulp-2026-v6';
 
 const ARCHIVOS = [
   './',
   'index.html',
   'editor.html',
+  'imprimir.html',
   'manifest.webmanifest',
   'css/app.css',
+  'css/fuente.css',
+  'fonts/montserrat-latin.woff2',
   'css/marcas.css',
   'js/app.js',
   'js/datos.js',
@@ -19,10 +22,13 @@ const ARCHIVOS = [
   'js/cronograma.js',
   'js/buscador.js',
   'js/perfil.js',
+  'js/qr.js',
   'img/mapa.webp',
   'img/mapa@2x.webp',
   'img/oficial.webp',
   'img/entorno.svg',
+  'img/splash.webp',
+  'img/splash-fijo.webp',
   'img/icons/icon-192.png',
   'img/icons/icon-512.png',
   'img/icons/icon-maskable.png',

@@ -11,10 +11,26 @@
 <link rel="apple-touch-icon" href="img/icons/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MINULP 2026">
+<link rel="preload" href="fonts/montserrat-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fuente.css">
 <link rel="stylesheet" href="css/marcas.css">
 <link rel="stylesheet" href="css/app.css">
+<!-- La portada se pinta antes que nada para que no haya un destello blanco.
+     Va en linea a proposito: si esperara al css externo, ya seria tarde. -->
+<style>
+  #portada { position: fixed; inset: 0; z-index: 100; background: #0e153e;
+             display: grid; place-items: center; }
+  #portada[hidden] { display: none; }
+</style>
 </head>
 <body>
+
+<div id="portada" role="status" aria-label="Cargando MINULP 2026">
+  <div class="portada-caja">
+    <img id="portada-anim" src="img/splash.webp" alt="" width="224" height="224" decoding="async">
+    <p class="portada-txt">MINULP 2026</p>
+  </div>
+</div>
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 
@@ -24,7 +40,7 @@
     <p class="cabecera-titulo">MINULP 2026</p>
     <p class="cabecera-sub">República de los Niños · 22 al 25 de septiembre</p>
   </div>
-  <button type="button" class="chip-perfil" id="btn-perfil" aria-label="Elegir tu órgano y tu rol">
+  <button type="button" class="chip-perfil" id="btn-perfil" aria-label="Elegir tu órgano">
     <span id="chip-perfil-txt">Elegí tu órgano</span>
   </button>
 </header>
@@ -119,21 +135,17 @@
 <!-- =============================================================== PERFIL -->
 <dialog class="modal" id="modal-perfil" aria-labelledby="modal-perfil-titulo">
   <form method="dialog" class="modal-caja">
-    <h2 id="modal-perfil-titulo">¿Quién sos en el modelo?</h2>
-    <p class="modal-ayuda">Sirve para mostrarte tu sede y tu cronograma. Lo podés cambiar cuando quieras.</p>
+    <h2 id="modal-perfil-titulo">¿De qué órgano sos?</h2>
+    <p class="modal-ayuda">Sirve para mostrarte tu sede en el mapa y filtrar el cronograma.
+      Podés seguir sin elegir nada y ver todo completo; se cambia cuando quieras.</p>
 
     <fieldset>
-      <legend>Tu órgano</legend>
+      <legend class="oculto">Elegí tu órgano</legend>
       <div class="grilla-organos" id="grilla-organos"></div>
     </fieldset>
 
-    <fieldset>
-      <legend>Tu rol</legend>
-      <div class="grilla-roles" id="grilla-roles"></div>
-    </fieldset>
-
     <div class="modal-pie">
-      <button type="submit" value="omitir" class="btn-sec">Ahora no</button>
+      <button type="submit" value="omitir" class="btn-sec">Ver todo</button>
       <button type="submit" value="guardar" class="btn-pri" id="btn-guardar-perfil">Listo</button>
     </div>
   </form>

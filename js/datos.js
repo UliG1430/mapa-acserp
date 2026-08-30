@@ -190,18 +190,6 @@ export const CRONOGRAMA = [
 ];
 
 /* ---------------------------------------------------------------------------
-   ROLES
-   Cambian que se destaca en la seccion Info. No bloquean nada.
-   --------------------------------------------------------------------------- */
-export const ROLES = [
-  { id: 'delegado',  nombre: 'Delegado/a', destaca: ['salud', 'sanitarios', 'comida'] },
-  { id: 'autoridad', nombre: 'Autoridad',  destaca: ['salud', 'info', 'sede'] },
-  { id: 'profesor',  nombre: 'Profesor/a', destaca: ['salud', 'info', 'acceso'] },
-  { id: 'ujier',     nombre: 'Ujier',      destaca: ['sanitarios', 'acceso', 'sede'] },
-  { id: 'prensa',    nombre: 'Prensa',     destaca: ['info', 'sede', 'acceso'] },
-];
-
-/* ---------------------------------------------------------------------------
    CONTACTOS  ->  COMPLETAR ANTES DEL MODELO
    Dejar tel en '' oculta el boton de llamada.
    --------------------------------------------------------------------------- */
@@ -231,6 +219,7 @@ export const CREDITOS = {
   autor: 'Joaquín Galasso',
   instagram: 'https://www.instagram.com/joacogalasso/',
   usuario: '@joacogalasso',
+  para: 'ACSERP',
   organizacion: 'Asociación Civil Simulacros Educativos Río de la Plata',
   sitio: 'https://acserp.org.ar',
 };

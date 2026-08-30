@@ -5,7 +5,8 @@
 // ============================================================================
 
 import { LUGARES, ORGANOS } from './datos.js';
-import { MAPA_PX, ENTORNO_PX, aPixel, pxPorMetro, dentroDelPredio } from './geo.js';
+import { MAPA_PX, ENTORNO_PX, aPixel, aLatLon, pxPorMetro, distancia, direccionHacia,
+         dentroDelPredio, formatearDistancia } from './geo.js';
 
 export const TIPOS = {
   sede:       { etiqueta: 'Órganos',        color: 'var(--c-minulp)' },
@@ -33,19 +34,40 @@ export const GRUPOS = [
 
 const SVG = {
   sanitarios: '<path d="M7 3.6a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0ZM3 7h3l1.4 5H6.3l-.1 5h-2l-.1-5H3ZM16.5 3.6a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0ZM13 7h4l1.6 5.4h-1.5L17 17h-4l-.1-4.6h-1.5Z"/>',
-  accesible: '<path d="M13 3.4a1.7 1.7 0 1 1-3.4 0 1.7 1.7 0 0 1 3.4 0ZM9.4 6.4h2.3v3.4h4v2h-4v2.1c1.6.3 2.8 1.6 2.8 3.2h-2a1.9 1.9 0 0 0-3.8 0c0 .3 0 .5.1.7l-1.8.9a3.9 3.9 0 0 1 2.4-5.6Z"/>',
+  accesible: '<circle cx="13.2" cy="3.9" r="2.3"/><path d="M11.3 7.3h1.6c.85 0 1.5.55 1.7 1.35l.6 2.55h2.6a1.15 1.15 0 0 1 0 2.3h-3.5c-.8 0-1.45-.5-1.65-1.3l-.25-1v2.35h2.6c.7 0 1.3.4 1.5 1.05l1.5 4.1-2.1.75-1.3-3.6h-4.5a1.75 1.75 0 0 1-1.75-1.75V9.05c0-.95.8-1.75 1.75-1.75Z"/><path d="M9 11.6v2.3a3.9 3.9 0 1 0 4.2 4.9h2.35A6.2 6.2 0 1 1 9 11.6Z"/>',
   comida: '<path d="M5 2.5h1.7v6h.9v-6h1.7v6h.9v-6H12V10c0 1-.7 1.8-1.6 2v6h-2v-6C7.5 11.8 5 11 5 10ZM15.6 2.5h1.6v15.5h-2V12h-1.4V7.2c0-2.2.7-4 1.8-4.7Z"/>',
-  kiosco: '<path d="M4 8.5h13l-.9 8.6a1.2 1.2 0 0 1-1.2 1H6.1a1.2 1.2 0 0 1-1.2-1Zm2.6-1.7a4 4 0 0 1 7.8 0Z"/>',
+  kiosco: '<circle cx="10.5" cy="7.8" r="5.2"/><path d="M9.55 12.8h1.9v5.6a.95.95 0 0 1-1.9 0Z"/>',
   heladeria: '<path d="M10.5 2.4a4.1 4.1 0 0 1 4 3.4 2.4 2.4 0 0 1-.5 4.7H7a2.4 2.4 0 0 1-.5-4.7 4.1 4.1 0 0 1 4-3.4ZM7.4 12h6.2l-2.5 6a.8.8 0 0 1-1.3 0Z"/>',
   salud: '<path d="M8.4 2.6h4.2v5.5h5.5v4.2h-5.5v5.5H8.4v-5.5H2.9V8.1h5.5Z"/>',
   info: '<path d="M11.8 3.4a1.8 1.8 0 1 1-3.6 0 1.8 1.8 0 0 1 3.6 0ZM8.4 7.5h3.3v10.1H8.4Z"/>',
-  acceso: '<path d="M10.5 1.8 18 8.2v9.4h-5.1v-5.2H8.1v5.2H3V8.2Z"/>',
+  acceso: '<path d="M11.4 2.2h6.2v16.6h-6.2v-2.1h4.1V4.3h-4.1Z"/><path d="m7.6 6.1 5.2 4.4-5.2 4.4v-3.2H2.8V9.3h4.8Z"/>',
   estacion: '<path d="M4.6 2.6h5.3c3.1 0 5 1.8 5 4.7s-1.9 4.8-5 4.8H7.9v5.3H4.6Zm3.3 2.9v3.7h1.7c1.2 0 1.9-.7 1.9-1.9s-.7-1.8-1.9-1.8Z"/>',
   edificio: '<circle cx="10.5" cy="10.5" r="4.5"/>',
 };
 
+/**
+ * Cada icono se dibujo con su propia caja, asi que un viewBox comun los dejaba
+ * descentrados y de tamanos distintos. Estos son los recuadros reales de cada
+ * dibujo, cuadrados y centrados: se midieron con getBBox() y se anotaron aca.
+ * Si se cambia un trazado hay que volver a medirlo.
+ */
+const CAJAS = {
+  sede:       '5.73 5.73 9.54 9.54',
+  sanitarios: '2.53 1.23 16.54 16.54',
+  accesible:  '-0.77 0.93 23.72 23.72',
+  comida:     '2.88 2.04 16.43 16.43',
+  kiosco:     '1.62 2.10 17.75 17.75',
+  heladeria:  '2.06 1.92 16.89 16.89',
+  salud:      '2.44 2.14 16.11 16.11',
+  info:       '1.52 1.12 16.96 16.96',
+  acceso:     '1.40 1.70 17.60 17.60',
+  estacion:   '1.91 2.16 15.69 15.69',
+  edificio:   '5.73 5.73 9.54 9.54',
+};
+
 export function icono(tipo) {
-  return `<svg viewBox="0 0 21 21" aria-hidden="true" focusable="false">${
+  const caja = CAJAS[tipo] || CAJAS.edificio;
+  return `<svg viewBox="${caja}" aria-hidden="true" focusable="false">${
     SVG[tipo] || SVG.edificio}</svg>`;
 }
 
@@ -61,7 +83,7 @@ export function todosLosPuntos() {
   return [...sedes, ...LUGARES.map((l) => ({ ...l, organo: null }))];
 }
 
-export function crearMapa(raiz, { alSeleccionar, alTocarMapa } = {}) {
+export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = {}) {
   const puntos = todosLosPuntos();
 
   raiz.innerHTML = `
@@ -74,13 +96,22 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa } = {}) {
         <div class="yo-halo" id="yo-halo"></div>
         <div class="yo-punto"></div>
       </div>
-    </div>`;
+    </div>
+    <button type="button" class="yo-borde" id="yo-borde" hidden>
+      <span class="yo-borde-flecha">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 20.5 20 12 15.6 3.5 20Z"/></svg>
+      </span>
+      <span class="yo-borde-txt" id="yo-borde-txt"></span>
+    </button>`;
 
   const lienzo = raiz.querySelector('#mapa-lienzo');
   const fondo = raiz.querySelector('#mapa-fondo');
   const capa = raiz.querySelector('#mapa-marcas');
   const yo = raiz.querySelector('#yo');
   const halo = raiz.querySelector('#yo-halo');
+  const borde = raiz.querySelector('#yo-borde');
+  const bordeTxt = raiz.querySelector('#yo-borde-txt');
+  borde.addEventListener('click', (e) => { e.stopPropagation(); api.irAMiUbicacion(); });
 
   // Calles reales de alrededor del predio (OpenStreetMap), dibujadas con la misma
   // homografia que el resto. Se inyecta en el DOM en vez de usarse como <img>
@@ -122,7 +153,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa } = {}) {
   }
 
   // ----------------------------------------------------------------- estado
-  let z = 1, tx = 0, ty = 0, zMin = 0.5, zMax = 4;
+  let z = 1, tx = 0, ty = 0, zMin = 0.5, zMax = 4, zPiso = 0.2;
   let filtros = new Set(GRUPOS.map((g) => g.id));
   let seleccion = null;
   let ubic = null;
@@ -133,6 +164,8 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa } = {}) {
     const r = raiz.getBoundingClientRect();
     zMin = Math.min(r.width, r.height) / MAPA_PX;
     zMax = zMin * 7;
+    // se puede alejar hasta abarcar tambien las calles de alrededor
+    zPiso = zMin * (MAPA_PX / (MAPA_PX + 2 * ENTORNO_PX)) * 0.98;
     return r;
   }
 
@@ -183,7 +216,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa } = {}) {
   function zoomA(nuevoZ, cx, cy) {
     const r = raiz.getBoundingClientRect();
     if (cx === undefined) { cx = r.width / 2; cy = r.height / 2; }
-    const nz = Math.min(zMax, Math.max(zMin * 0.95, nuevoZ));
+    const nz = Math.min(zMax, Math.max(zPiso, nuevoZ));
     tx = cx - ((cx - tx) / z) * nz;
     ty = cy - ((cy - ty) / z) * nz;
     z = nz;
@@ -194,7 +227,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa } = {}) {
   /** Lleva un punto del mapa (fracciones 0..1) al centro de la pantalla. */
   function centrar(fx, fy, zObjetivo) {
     const r = raiz.getBoundingClientRect();
-    if (zObjetivo) z = Math.min(zMax, Math.max(zMin, zObjetivo));
+    if (zObjetivo) z = Math.min(zMax, Math.max(zPiso, zObjetivo));
     tx = r.width / 2 - fx * MAPA_PX * z;
     ty = r.height / 2 - fy * MAPA_PX * z;
     limitar();
@@ -259,7 +292,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa } = {}) {
       const d = Math.hypot(a.x - b.x, a.y - b.y);
       const cx = (a.x + b.x) / 2 - r.left;
       const cy = (a.y + b.y) / 2 - r.top;
-      const nz = Math.min(zMax, Math.max(zMin * 0.95, pellizco.z * (d / pellizco.d)));
+      const nz = Math.min(zMax, Math.max(zPiso, pellizco.z * (d / pellizco.d)));
       const px = (pellizco.cx - r.left - pellizco.tx) / pellizco.z;
       const py = (pellizco.cy - r.top - pellizco.ty) / pellizco.z;
       z = nz;
@@ -334,16 +367,89 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa } = {}) {
   });
 
   // ------------------------------------------------------------- ubicacion
+  const CENTRO_MAPA = aLatLon(MAPA_PX / 2, MAPA_PX / 2);
+
   function ubicarPunto() {
-    if (!ubic) { yo.hidden = true; return; }
+    if (!ubic) {
+      yo.hidden = true;
+      borde.hidden = true;
+      if (alQuedarFuera) alQuedarFuera(false, 0);
+      return;
+    }
     const p = aPixel(ubic.lat, ubic.lon);
-    yo.hidden = false;
-    yo.style.left = (p.x / MAPA_PX * 100) + '%';
-    yo.style.top = (p.y / MAPA_PX * 100) + '%';
-    const radio = Math.max(6, ubic.precision * pxPorMetro(ubic.lat, ubic.lon));
-    halo.style.width = halo.style.height = (radio * 2) + 'px';
-    yo.classList.toggle('yo-impreciso', ubic.precision > 50);
-    yo.style.setProperty('--yo-escala', escalaPantalla / z);
+    // si la proyeccion cayo del otro lado del horizonte, el punto no significa
+    // nada: lo escondemos y dejamos que hable la flecha del borde
+    yo.hidden = !p.valido;
+    if (p.valido) {
+      yo.style.left = (p.x / MAPA_PX * 100) + '%';
+      yo.style.top = (p.y / MAPA_PX * 100) + '%';
+      const radio = Math.max(6, ubic.precision * pxPorMetro(ubic.lat, ubic.lon));
+      halo.style.width = halo.style.height = (radio * 2) + 'px';
+      yo.classList.toggle('yo-impreciso', ubic.precision > 50);
+      yo.style.setProperty('--yo-escala', escalaPantalla / z);
+    }
+    marcarBorde(p);
+  }
+
+  /**
+   * Si tu punto quedo fuera de la pantalla, en vez de perderlo mostramos una
+   * flecha pegada al borde que apunta hacia donde estas, con la distancia.
+   * Es la misma idea que el marcador del borde del mapa en Minecraft: el punto
+   * sigue existiendo aunque no entre en el recuadro.
+   */
+  function marcarBorde(p) {
+    const r = raiz.getBoundingClientRect();
+    if (!r.width) return;
+    const m = 40;
+    const cx = r.width / 2;
+    const cy = r.height / 2;
+
+    if (p.valido) {
+      const sx = tx + p.x * z;
+      const sy = ty + p.y * z;
+      if (sx > m && sx < r.width - m && sy > m && sy < r.height - m) {
+        borde.hidden = true;
+        if (alQuedarFuera) alQuedarFuera(false, 0);
+        return;
+      }
+    }
+
+    // La direccion NO se saca de la posicion proyectada: para puntos lejanos esa
+    // posicion puede estar espejada. Se saca de un paso corto desde el centro de
+    // la vista hacia la ubicacion real, que siempre cae de este lado del horizonte.
+    const centro = { px: (cx - tx) / z, py: (cy - ty) / z };
+    const dir = direccionHacia(centro.px, centro.py, ubic.lat, ubic.lon);
+    const dx = dir.dx;
+    const dy = dir.dy;
+    if (!dx && !dy) { borde.hidden = true; return; }
+    const hw = Math.max(12, cx - m);
+    const hh = Math.max(12, cy - m);
+    const k = Math.min(hw / Math.max(Math.abs(dx), 1e-6), hh / Math.max(Math.abs(dy), 1e-6));
+    borde.style.left = (cx + dx * k) + 'px';
+    borde.style.top = (cy + dy * k) + 'px';
+    borde.style.setProperty('--ang', (Math.atan2(dy, dx) * 180 / Math.PI + 90) + 'deg');
+
+    const metros = distancia(ubic.lat, ubic.lon, CENTRO_MAPA.lat, CENTRO_MAPA.lon);
+    bordeTxt.textContent = formatearDistancia(metros);
+    borde.setAttribute('aria-label',
+      `Estás a ${formatearDistancia(metros)} del centro del predio. Tocá para verte en el mapa.`);
+    borde.hidden = false;
+    if (alQuedarFuera) alQuedarFuera(true, metros);
+  }
+
+  /** Encuadra una caja dada en pixeles del mapa, con aire alrededor. */
+  function encuadrarCaja(x0, y0, x1, y1) {
+    const r = raiz.getBoundingClientRect();
+    x0 = Math.max(-ENTORNO_PX, x0); y0 = Math.max(-ENTORNO_PX, y0);
+    x1 = Math.min(MAPA_PX + ENTORNO_PX, x1); y1 = Math.min(MAPA_PX + ENTORNO_PX, y1);
+    const pad = 46;
+    const nz = Math.min((r.width - 2 * pad) / Math.max(1, x1 - x0),
+                        (r.height - 2 * pad) / Math.max(1, y1 - y0));
+    z = Math.min(zMax, Math.max(zPiso, nz));
+    tx = r.width / 2 - ((x0 + x1) / 2) * z;
+    ty = r.height / 2 - ((y0 + y1) / 2) * z;
+    limitar();
+    aplicar();
   }
 
   /**
@@ -416,7 +522,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa } = {}) {
   ro.observe(raiz);
   vistaInicial();
 
-  return {
+  const api = {
     puntos,
     encuadrar: () => { tocado = true; encuadrar(); },
     vistaInicial,
@@ -445,12 +551,44 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa } = {}) {
       }
     },
     ubicacion: () => ubic,
+    /**
+     * Boton "dónde estoy". Si estás en el predio te centra y acerca. Si estás
+     * afuera NO te lleva hasta ahí (verias campo vacio): encuadra el predio y
+     * tu posicion a la vez, para que entiendas de que lado venis.
+     */
     irAMiUbicacion() {
       if (!ubic) return false;
       tocado = true;
+      const dentro = dentroDelPredio(ubic.lat, ubic.lon);
       const p = aPixel(ubic.lat, ubic.lon);
-      centrar(p.x / MAPA_PX, p.y / MAPA_PX, Math.max(z, zMin * 3));
-      return dentroDelPredio(ubic.lat, ubic.lon);
+      if (dentro) {
+        centrar(p.x / MAPA_PX, p.y / MAPA_PX, Math.max(z, zMin * 3));
+      } else if (p.valido) {
+        encuadrarCaja(Math.min(0, p.x), Math.min(0, p.y),
+                      Math.max(MAPA_PX, p.x), Math.max(MAPA_PX, p.y));
+      } else {
+        // estas tan lejos que el punto no se puede dibujar: mostramos todo lo
+        // que hay mapeado y que la flecha del borde indique para donde queda
+        encuadrarCaja(-ENTORNO_PX, -ENTORNO_PX, MAPA_PX + ENTORNO_PX, MAPA_PX + ENTORNO_PX);
+      }
+      return dentro;
+    },
+
+    /**
+     * Lo que se hace con la PRIMERA lectura del GPS. Si estás en el predio,
+     * te lleva. Si estás lejos, deja el mapa donde estaba y solo aparece la
+     * flecha del borde: mover la vista a un descampado no le sirve a nadie.
+     */
+    enfocarPrimeraLectura() {
+      if (!ubic) return false;
+      const dentro = dentroDelPredio(ubic.lat, ubic.lon);
+      if (dentro) {
+        tocado = true;
+        const p = aPixel(ubic.lat, ubic.lon);
+        centrar(p.x / MAPA_PX, p.y / MAPA_PX, Math.max(z, zMin * 3));
+      }
+      return dentro;
     },
   };
+  return api;
 }

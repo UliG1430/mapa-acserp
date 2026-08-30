@@ -2,12 +2,12 @@
 //  app.js — arma la interfaz y conecta mapa, cronograma, buscador y perfil.
 // ============================================================================
 
-import { ORGANOS, LUGARES, CRONOGRAMA, ROLES, CONTACTOS, INFO, CREDITOS } from './datos.js';
+import { ORGANOS, CRONOGRAMA, CONTACTOS, INFO, CREDITOS } from './datos.js';
 import { crearMapa, TIPOS, GRUPOS, icono, todosLosPuntos } from './mapa.js';
 import * as geo from './geo.js';
 import * as cron from './cronograma.js';
 import { buscar, sugerencias } from './buscador.js';
-import { obtenerPerfil, guardarPerfil, alCambiarPerfil, miOrgano, miSede, miRol, miTrack }
+import { obtenerPerfil, guardarPerfil, alCambiarPerfil, miOrgano, miTrack }
   from './perfil.js';
 
 const $ = (s) => document.querySelector(s);
@@ -43,7 +43,18 @@ $$('.tabbar button').forEach((b) => b.addEventListener('click', () => irA(b.data
 //  MAPA
 // ===========================================================================
 function iniciarMapa() {
-  mapa = crearMapa($('#mapa'), { alSeleccionar: pintarFicha });
+  mapa = crearMapa($('#mapa'), {
+    alSeleccionar: pintarFicha,
+    // cuando tu punto se sale de la pantalla, el boton de ubicacion late para
+    // que se entienda que tocandolo volves a encontrarte
+    alQuedarFuera(fuera, metros) {
+      const b = $('#btn-ubicar');
+      b.classList.toggle('ctrl-late', fuera);
+      b.setAttribute('aria-label', fuera
+        ? `Estás fuera de la vista, a ${geo.formatearDistancia(metros)}. Tocá para verte en el mapa.`
+        : 'Mostrar dónde estoy');
+    },
+  });
 
   const cont = $('#filtros');
   cont.innerHTML = GRUPOS.map((g) =>
@@ -105,11 +116,11 @@ function alternarGps() {
       estadoGps = 'activo';
       $('#btn-ubicar').dataset.estado = 'activo';
       mapa.setUbicacion(u);
-      if (primera) mapa.irAMiUbicacion();
+      if (primera) mapa.enfocarPrimeraLectura();
       if (!geo.dentroDelPredio(u.lat, u.lon)) {
         const acc = puntoMasCercano(u, (p) => p.tipo === 'acceso');
         avisar(acc
-          ? `Estás fuera del predio. El acceso más cercano es ${acc.punto.nombre}, a ${geo.formatearDistancia(acc.metros)}.`
+          ? `Estás fuera del predio, a ${geo.formatearDistancia(acc.metros)} de ${acc.punto.nombre}.`
           : 'Estás fuera del predio.');
       } else if (u.precision > 50) {
         avisar(`Ubicación aproximada (± ${Math.round(u.precision)} m). Salí a un lugar abierto para mejorarla.`);
@@ -153,13 +164,14 @@ function puntoMasCercano(u, filtro = () => true) {
 function distanciaA(punto, u) {
   if (!u) return null;
   const c = geo.aLatLon(punto.x * geo.MAPA_PX, punto.y * geo.MAPA_PX);
-  const yo = geo.aPixel(u.lat, u.lon);
+  // La flecha se calcula desde el LUGAR hacia vos y se invierte, en vez de
+  // proyectar tu posicion: si estás lejos, esa proyeccion puede venir espejada.
+  const d = geo.direccionHacia(punto.x * geo.MAPA_PX, punto.y * geo.MAPA_PX, u.lat, u.lon);
   return {
     metros: geo.distancia(u.lat, u.lon, c.lat, c.lon),
     rumbo: geo.rumbo(u.lat, u.lon, c.lat, c.lon),
-    // hacia donde apunta la flecha sobre el dibujo (la flecha del svg mira al norte)
-    anguloMapa: Math.atan2(punto.y * geo.MAPA_PX - yo.y,
-                           punto.x * geo.MAPA_PX - yo.x) * 180 / Math.PI + 90,
+    // el svg de la flecha apunta hacia arriba, de ahi el +90
+    anguloMapa: Math.atan2(-d.dy, -d.dx) * 180 / Math.PI + 90,
   };
 }
 
@@ -420,13 +432,12 @@ $('#resultados').addEventListener('click', (e) => {
 //  INFO
 // ===========================================================================
 function pintarInfo() {
-  const rol = miRol();
   const o = miOrgano();
   const partes = [];
 
   if (o) {
     partes.push(`<div class="tarjeta">
-      <h2>Sos ${rol ? esc(rol.nombre.toLowerCase()) : 'parte'} de ${esc(o.sigla)}</h2>
+      <h2>Sos de ${esc(o.sigla)}</h2>
       <p>${esc(o.nombre)}. Sesiona en <b>${esc(o.sede)}</b>${
         cron.nombreTrack(o.track) === o.nombre ? '' : ', dentro de ' + esc(cron.nombreTrack(o.track))}.</p>
       <div class="ficha-acciones">
@@ -435,9 +446,10 @@ function pintarInfo() {
       </div></div>`);
   } else {
     partes.push(`<div class="tarjeta">
-      <h2>Todavía no elegiste tu órgano</h2>
-      <p>Si lo elegís, el cronograma te muestra solo lo tuyo y el mapa te marca tu sede.</p>
-      <div class="ficha-acciones"><button type="button" class="btn-pri" id="info-cambiar">Elegir órgano y rol</button></div>
+      <h2>Estás viendo todo el modelo</h2>
+      <p>Si elegís tu órgano, el cronograma te muestra solo lo tuyo y el mapa te marca tu sede.
+      No es obligatorio: así como está funciona igual.</p>
+      <div class="ficha-acciones"><button type="button" class="btn-pri" id="info-cambiar">Elegir mi órgano</button></div>
     </div>`);
   }
 
@@ -458,6 +470,17 @@ function pintarInfo() {
   partes.push('<h2 class="lista-grupo">Lo que conviene saber</h2>');
   partes.push(INFO.map((i) => `<div class="tarjeta"><h2>${esc(i.titulo)}</h2><p>${esc(i.texto)}</p></div>`).join(''));
 
+  partes.push(`<h2 class="lista-grupo">Para imprimir</h2>
+    <div class="tarjeta">
+      <h2>Mapa en papel</h2>
+      <p>Armá una hoja A4 con el mapa del predio y las referencias, eligiendo qué órganos y
+      qué servicios aparecen. Sirve para acreditaciones, para los ujieres y para quien no
+      quiera depender del celular.</p>
+      <div class="ficha-acciones">
+        <a class="btn-pri" href="imprimir.html" style="text-align:center;text-decoration:none;line-height:1.6">Armar el mapa para imprimir</a>
+      </div>
+    </div>`);
+
   partes.push(`<h2 class="lista-grupo">La app</h2>
     <div class="tarjeta">
       <h2>Guardala en tu celular</h2>
@@ -471,13 +494,13 @@ function pintarInfo() {
     </div>`);
 
   partes.push(`<p class="firma">
-      Mapa y cronograma desarrollados por
+      Diseñado y desarrollado por
       <a href="${esc(CREDITOS.instagram)}" target="_blank" rel="noopener noreferrer">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.9.07 1.2.05 1.8.25 2.2.42.6.22 1 .48 1.4.9.43.42.7.83.92 1.4.17.42.37 1.05.42 2.24.06 1.28.07 1.66.07 4.88s0 3.6-.07 4.88c-.05 1.19-.25 1.82-.42 2.24-.22.57-.49.98-.91 1.4-.42.42-.83.69-1.4.91-.42.17-1.05.37-2.24.42-1.28.06-1.66.07-4.88.07s-3.6 0-4.88-.07c-1.19-.05-1.82-.25-2.24-.42a3.8 3.8 0 0 1-1.4-.91 3.8 3.8 0 0 1-.91-1.4c-.17-.42-.37-1.05-.42-2.24C2.2 15.6 2.2 15.22 2.2 12s0-3.6.07-4.88c.05-1.19.25-1.82.42-2.24.22-.57.49-.98.91-1.4.42-.42.83-.69 1.4-.91.42-.17 1.05-.37 2.24-.42C8.4 2.2 8.8 2.2 12 2.2Zm0 1.8c-3.16 0-3.5 0-4.74.07-.9.04-1.38.19-1.7.31-.43.17-.73.37-1.05.69-.32.32-.52.62-.69 1.05-.12.32-.27.8-.31 1.7C3.44 8.5 3.43 8.84 3.43 12s0 3.5.08 4.74c.4.9.19 1.38.31 1.7.17.43.37.73.69 1.05.32.32.62.52 1.05.69.32.12.8.27 1.7.31 1.24.06 1.58.07 4.74.07s3.5 0 4.74-.07c.9-.04 1.38-.19 1.7-.31.43-.17.73-.37 1.05-.69.32-.32.52-.62.69-1.05.12-.32.27-.8.31-1.7.06-1.24.07-1.58.07-4.74s0-3.5-.07-4.74c-.04-.9-.19-1.38-.31-1.7a2.8 2.8 0 0 0-.69-1.05 2.8 2.8 0 0 0-1.05-.69c-.32-.12-.8-.27-1.7-.31C15.5 4 15.16 4 12 4Zm0 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 1.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4Zm5.2-3.1a1.17 1.17 0 1 1 0 2.34 1.17 1.17 0 0 1 0-2.34Z"/></svg>
         ${esc(CREDITOS.usuario)}
       </a>
-      <small>Para el Modelo Intercolegial de Naciones Unidas de La Plata ·
-      ${esc(CREDITOS.organizacion)}.<br>
+      <span class="firma-para">para ${esc(CREDITOS.para)}</span>
+      <small>${esc(CREDITOS.organizacion)}.<br>
       Ilustración del predio: República de los Niños. Calles: © colaboradores de OpenStreetMap.</small>
     </p>`);
 
@@ -501,7 +524,7 @@ function pintarInfo() {
 // ===========================================================================
 //  PERFIL
 // ===========================================================================
-let elegido = { organo: null, rol: null };
+let elegido = { organo: null };
 
 function abrirPerfil() {
   elegido = { ...obtenerPerfil() };
@@ -511,9 +534,6 @@ function abrirPerfil() {
       <img src="img/logos/${o.sigla}.webp" alt="" width="192" height="192">
       ${esc(o.sigla)}
     </button>`).join('');
-  $('#grilla-roles').innerHTML = ROLES.map((r) => `
-    <button type="button" class="op-rol" data-rol="${esc(r.id)}"
-      aria-pressed="${elegido.rol === r.id}">${esc(r.nombre)}</button>`).join('');
   $('#modal-perfil').showModal();
 }
 
@@ -524,17 +544,9 @@ $('#grilla-organos').addEventListener('click', (e) => {
   $$('#grilla-organos .op-organo').forEach((x) =>
     x.setAttribute('aria-pressed', String(x.dataset.sigla === elegido.organo)));
 });
-$('#grilla-roles').addEventListener('click', (e) => {
-  const b = e.target.closest('.op-rol');
-  if (!b) return;
-  elegido.rol = elegido.rol === b.dataset.rol ? null : b.dataset.rol;
-  $$('#grilla-roles .op-rol').forEach((x) =>
-    x.setAttribute('aria-pressed', String(x.dataset.rol === elegido.rol)));
-});
-
 $('#modal-perfil').addEventListener('close', () => {
   if ($('#modal-perfil').returnValue === 'guardar') {
-    guardarPerfil({ organo: elegido.organo, rol: elegido.rol, listo: true });
+    guardarPerfil({ organo: elegido.organo, listo: true });
     if (elegido.organo && mapa) {
       irA('mapa');
       setTimeout(() => mapa.centrarEn('org-' + elegido.organo.toLowerCase()), 120);
@@ -548,15 +560,14 @@ $('#btn-perfil').addEventListener('click', abrirPerfil);
 
 function pintarChip() {
   const o = miOrgano();
-  const r = miRol();
   const el = $('#btn-perfil');
   if (o) {
     el.innerHTML = `<img src="img/logos/${o.sigla}.webp" alt="" width="192" height="192">
-                    <span>${esc(o.sigla)}${r ? ' · ' + esc(r.nombre.replace('/a', '')) : ''}</span>`;
-    el.setAttribute('aria-label', `Tu perfil: ${o.sigla}${r ? ', ' + r.nombre : ''}. Tocá para cambiarlo.`);
+                    <span>${esc(o.sigla)}</span>`;
+    el.setAttribute('aria-label', `Tu órgano: ${o.sigla}. Tocá para cambiarlo.`);
   } else {
     el.innerHTML = '<span>Elegí tu órgano</span>';
-    el.setAttribute('aria-label', 'Elegir tu órgano y tu rol');
+    el.setAttribute('aria-label', 'Elegir tu órgano');
   }
 }
 alCambiarPerfil(() => {
@@ -566,9 +577,68 @@ alCambiarPerfil(() => {
 });
 
 // ===========================================================================
+//  PORTADA
+//  El logo se dibuja de cero mientras carga el mapa, y se muestra SIEMPRE:
+//  es la primera impresion de la app. Lo unico que la puede acortar es que
+//  la red este muy mal (hay un tope) o que el sistema pida menos animacion.
+// ===========================================================================
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+const DURACION_PORTADA = 1450;   // lo que dura splash.webp, en ms
+
+function portada() {
+  const el = $('#portada');
+  if (!el) return Promise.resolve();
+  const img = $('#portada-anim');
+  const menosMovimiento = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // El <img> ya apunta al webp animado, asi que arranca en el primer cuadro
+  // (vacio) y se dibuja solo. Con menos movimiento pedido, mostramos el logo
+  // terminado y listo.
+  if (menosMovimiento) {
+    img.src = 'img/splash-fijo.webp';
+  } else {
+    // Reiniciamos la animacion a mano: un webp animado que ya corrio su unica
+    // vuelta no vuelve a arrancar cuando la pagina se recarga desde el cache.
+    // Sacar y volver a poner el src la reinicia sin volver a descargarla.
+    const url = img.getAttribute('src');
+    img.removeAttribute('src');
+    void img.offsetWidth;
+    img.setAttribute('src', url);
+  }
+
+  const animacionLista = new Promise((res) => {
+    if (img.complete && img.naturalWidth) { res(); return; }
+    img.addEventListener('load', res, { once: true });
+    img.addEventListener('error', res, { once: true });
+  });
+
+  const mapaListo = new Promise((res) => {
+    const fondo = $('#mapa-fondo');
+    if (!fondo || fondo.complete) { res(); return; }
+    fondo.addEventListener('load', res, { once: true });
+    fondo.addEventListener('error', res, { once: true });
+  });
+
+  // Esperamos a que la animacion este descargada (con tope, para no dejar la
+  // app trabada si la red esta mal) y recien ahi le damos su tiempo completo.
+  return Promise.race([animacionLista, espera(2500)])
+    .then(() => {
+      if (menosMovimiento) return espera(500);
+      // el webp dura 1,4 s; le damos ese tiempo desde que se pudo empezar a ver
+      return Promise.all([espera(DURACION_PORTADA), mapaListo]);
+    })
+    .then(() => {
+      el.classList.add('saliendo');
+      return espera(menosMovimiento ? 0 : 450);
+    })
+    .then(() => { el.hidden = true; });
+}
+
+// ===========================================================================
 //  ARRANQUE
 // ===========================================================================
 iniciarMapa();
+const portadaTerminada = portada();
 pintarChip();
 pintarAtajos();
 verComo('mapa');
@@ -576,7 +646,10 @@ verComo('mapa');
 const vistaInicial = (location.hash || '').replace('#', '');
 irA(['mapa', 'cronograma', 'buscar', 'info'].includes(vistaInicial) ? vistaInicial : 'mapa', false);
 
-if (!obtenerPerfil().listo) setTimeout(abrirPerfil, 700);
+// el modal no debe taparle la portada a nadie: espera a que termine
+portadaTerminada.then(() => {
+  if (!obtenerPerfil().listo) setTimeout(abrirPerfil, 260);
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

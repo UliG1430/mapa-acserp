@@ -1,13 +1,13 @@
 // ============================================================================
-//  perfil.js — que organo y que rol tiene quien esta usando la app.
+//  perfil.js — que organo eligio quien esta usando la app.
 //  Se guarda en el navegador; no viaja a ningun servidor.
 // ============================================================================
 
-import { ORGANOS, ROLES, LUGARES } from './datos.js';
+import { ORGANOS, LUGARES } from './datos.js';
 
 const CLAVE = 'minulp2026.perfil';
 
-let perfil = { organo: null, rol: null, listo: false };
+let perfil = { organo: null, listo: false };
 
 try {
   const crudo = localStorage.getItem(CLAVE);
@@ -44,10 +44,6 @@ export function miOrgano() {
 export function miSede() {
   const o = miOrgano();
   return o ? LUGARES.find((l) => l.id === o.sede) || null : null;
-}
-
-export function miRol() {
-  return ROLES.find((r) => r.id === perfil.rol) || null;
 }
 
 /** Que columna del cronograma me toca: 'sti' | 'cs' | 'asamblearios' | null */

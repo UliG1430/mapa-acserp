@@ -35,7 +35,7 @@
   --e-senda: #b3b2a0;
   --e-riel: #a5a598;
   --e-texto: #5d6051;
-  --tipo: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --tipo: 'Montserrat', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -110,6 +110,35 @@ button, input { font: inherit; color: inherit; }
   border-radius: 0 0 10px 10px; text-decoration: none;
 }
 .saltar:focus { top: 0; }
+
+/* --------------------------------------------------------------- portada */
+/* El color es el mismo fondo del video del logo, asi que no se ve la costura. */
+#portada {
+  position: fixed; inset: 0; z-index: 100;
+  background: #0e153e;
+  display: grid; place-items: center;
+  transition: opacity .45s ease;
+}
+#portada.saliendo { opacity: 0; pointer-events: none; }
+#portada[hidden] { display: none; }
+.portada-caja { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+#portada-anim {
+  width: 112px; height: 112px; display: block;
+  /* el webp con perdida deja un leve ruido en el fondo plano; este desvanecido
+     de los ultimos pixeles hace que no se note el recuadro de la imagen */
+  -webkit-mask-image: radial-gradient(closest-side, #000 92%, transparent 100%);
+          mask-image: radial-gradient(closest-side, #000 92%, transparent 100%);
+}
+.portada-txt {
+  margin: 0; color: #fff; font-weight: 700; letter-spacing: .18em;
+  font-size: .82rem; opacity: .85;
+  animation: portadaEntra .5s .35s both ease-out;
+}
+@keyframes portadaEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: .85; } }
+@media (prefers-reduced-motion: reduce) {
+  #portada { transition: none; }
+  .portada-txt { animation: none; }
+}
 
 /* --------------------------------------------------------------- cabecera */
 .cabecera {
@@ -353,6 +382,37 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
 .yo-impreciso .yo-punto { background: #7c8496; }
 @media (prefers-reduced-motion: reduce) {
   .yo-punto::after { animation: none; opacity: .5; }
+  .yo-borde-flecha, .ctrl-late { animation: none; }
+}
+
+/* ---- flecha del borde: donde quedas cuando tu punto no entra en pantalla ---- */
+.yo-borde {
+  position: absolute; z-index: 7;
+  transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 0; border: 0; background: none; cursor: pointer;
+}
+.yo-borde[hidden] { display: none; }
+.yo-borde-flecha {
+  display: grid; place-items: center;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--acento);
+  border: 3px solid var(--papel);
+  box-shadow: 0 2px 9px rgba(0, 0, 0, .38);
+  transform: rotate(var(--ang, 0deg));
+  animation: bordeLatir 2s ease-in-out infinite;
+}
+.yo-borde-flecha svg { width: 21px; height: 21px; fill: #fff; }
+.yo-borde-txt {
+  padding: 1px 7px; border-radius: 7px;
+  background: var(--papel); color: var(--tinta);
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+}
+@keyframes bordeLatir {
+  0%, 100% { box-shadow: 0 2px 9px rgba(0, 0, 0, .38), 0 0 0 0 rgba(0, 131, 202, .5); }
+  50%      { box-shadow: 0 2px 9px rgba(0, 0, 0, .38), 0 0 0 10px rgba(0, 131, 202, 0); }
 }
 
 /* ----------------------------------------------------------------- controles */
@@ -376,6 +436,12 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
 .ctrl-chico { width: var(--tap); height: var(--tap); }
 .ctrl-chico svg { width: 19px; height: 19px; opacity: .8; }
 .ctrl-ubicar[data-estado="activo"] { background: var(--acento); color: #fff; border-color: var(--acento); }
+/* si tu punto quedo fuera de la vista, el boton late para invitar a tocarlo */
+.ctrl-late { animation: ctrlLatir 1.8s ease-in-out infinite; }
+@keyframes ctrlLatir {
+  0%, 100% { box-shadow: var(--sombra-baja), 0 0 0 0 rgba(0, 131, 202, .55); }
+  50%      { box-shadow: var(--sombra-baja), 0 0 0 11px rgba(0, 131, 202, 0); }
+}
 .ctrl-ubicar[data-estado="buscando"] svg { animation: girar 1.4s linear infinite; }
 .ctrl[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
 @keyframes girar { to { transform: rotate(360deg); } }
@@ -393,8 +459,11 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
 }
 
 .aviso-gps {
-  position: absolute; left: 10px; right: 62px; bottom: 12px;
-  margin: 0; padding: 9px 12px;
+  /* tarjeta con ancho propio, no una banda estirada: asi el texto queda
+     enmarcado y no se pisa con el credito de abajo ni con la ficha */
+  position: absolute; left: 10px; bottom: 30px;
+  width: max-content; max-width: calc(100% - 72px);
+  margin: 0; padding: 9px 13px;
   border-radius: 10px;
   background: var(--navy); color: #fff;
   font-size: .82rem; line-height: 1.35;
@@ -639,6 +708,7 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
   text-decoration: none; font-weight: 700;
 }
 .firma svg { width: 18px; height: 18px; fill: currentColor; }
+.firma-para { display: block; margin-top: 6px; font-weight: 700; color: var(--tinta); }
 .firma small { display: block; margin-top: 10px; font-size: .74rem; line-height: 1.5; }
 
 /* ------------------------------------------------------------------ tabbar */
@@ -688,13 +758,6 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
 }
 .op-organo img { width: 34px; height: 34px; border-radius: 50%; }
 .op-organo[aria-pressed="true"] { border-color: var(--navy); border-width: 2px; background: var(--papel); }
-.grilla-roles { display: flex; flex-wrap: wrap; gap: 6px; }
-.op-rol {
-  min-height: var(--tap); padding: 9px 14px;
-  border: 1px solid var(--borde); border-radius: 999px;
-  background: var(--papel-2); font-weight: 600; font-size: .88rem; cursor: pointer;
-}
-.op-rol[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
 .modal-pie { display: flex; gap: 8px; margin-top: 4px; }
 
 /* --------------------------------------------------------- pantallas grandes */
@@ -704,5 +767,10 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
   .cabecera-titulo { font-size: 1.1rem; }
   #vista-cronograma, #vista-buscar, #vista-info { padding-left: max(16px, calc(50vw - 420px)); padding-right: max(16px, calc(50vw - 420px)); }
   .ficha { left: auto; right: 12px; bottom: 12px; width: 380px; border-radius: var(--r); border: 1px solid var(--borde); max-height: 76%; }
-  .aviso-gps { right: 410px; }
+  /* en pantalla grande el aviso es una tarjeta suelta arriba a la izquierda,
+     lejos del crédito de abajo y de la ficha de la derecha */
+  .aviso-gps {
+    left: 12px; right: auto; top: 12px; bottom: auto;
+    max-width: min(42ch, calc(100% - 430px));
+  }
 }

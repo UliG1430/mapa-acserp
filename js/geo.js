@@ -45,10 +45,41 @@ function aplicar(m, x, y) {
           (m[1][0] * x + m[1][1] * y + m[1][2]) / w];
 }
 
-/** lat/lon -> pixel del mapa (0..1254). Puede caer fuera si estas lejos. */
+/**
+ * lat/lon -> pixel del mapa (0..1254). Puede caer fuera si estas lejos.
+ *
+ * `valido` avisa si la proyeccion tiene sentido. Una homografia es una vista en
+ * perspectiva y tiene su propia linea de horizonte: en este mapa, a unos 3,7 km
+ * hacia el sur el denominador cambia de signo y el punto aparece ESPEJADO del
+ * otro lado. Para cualquier cosa lejana hay que usar direccionHacia(), no esto.
+ */
 export function aPixel(lat, lon) {
-  const [px, py] = aplicar(H, (lon - LON0) * KX, (lat - LAT0) * K);
-  return { x: px, y: py };
+  const X = (lon - LON0) * KX;
+  const Y = (lat - LAT0) * K;
+  const w = H[2][0] * X + H[2][1] * Y + 1;
+  return {
+    x: (H[0][0] * X + H[0][1] * Y + H[0][2]) / w,
+    y: (H[1][0] * X + H[1][1] * Y + H[1][2]) / w,
+    valido: w > 0.05,
+  };
+}
+
+/**
+ * Hacia donde queda una coordenada real, vista desde un punto del dibujo, en
+ * direccion de pixeles del mapa. Sirve para lugares lejanos: en vez de proyectar
+ * el punto (que puede caer del otro lado del horizonte) proyectamos un paso
+ * corto en esa direccion, donde la homografia todavia se porta bien.
+ */
+export function direccionHacia(pxDesde, pyDesde, lat, lon) {
+  const o = aLatLon(pxDesde, pyDesde);
+  const este = (lon - o.lon) * KX;
+  const norte = (lat - o.lat) * K;
+  const d = Math.hypot(este, norte);
+  if (d < 1) return { dx: 0, dy: 0, metros: 0 };
+  const PASO = 150;                       // metros: corto, siempre dentro del mapa
+  const cerca = aPixel(o.lat + (norte / d) * PASO / K,
+                       o.lon + (este / d) * PASO / KX);
+  return { dx: cerca.x - pxDesde, dy: cerca.y - pyDesde, metros: d };
 }
 
 /** pixel del mapa -> lat/lon. Se usa en el editor. */
