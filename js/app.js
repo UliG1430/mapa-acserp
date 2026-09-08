@@ -2,7 +2,7 @@
 //  app.js — arma la interfaz y conecta mapa, cronograma, buscador y perfil.
 // ============================================================================
 
-import { ORGANOS, CRONOGRAMA, CONTACTOS, INFO, CREDITOS } from './datos.js';
+import { ORGANOS, CRONOGRAMA, CONTACTOS, INFO, HERRAMIENTAS, CREDITOS } from './datos.js';
 import { crearMapa, TIPOS, GRUPOS, icono, todosLosPuntos } from './mapa.js';
 import * as geo from './geo.js';
 import * as cron from './cronograma.js';
@@ -38,6 +38,9 @@ function irA(vista, foco = true) {
 }
 
 $$('.tabbar button').forEach((b) => b.addEventListener('click', () => irA(b.dataset.vista)));
+
+// el logo del encabezado es el camino de vuelta al mapa desde cualquier lado
+$('#btn-inicio').addEventListener('click', () => { irA('mapa'); verComo('mapa'); });
 
 // ===========================================================================
 //  MAPA
@@ -87,6 +90,17 @@ function iniciarMapa() {
   if (sede) setTimeout(() => mapa.centrarEn('org-' + sede.sigla.toLowerCase()), 350);
 }
 
+/**
+ * Lleva un punto al centro del mapa desde donde sea que estes. Fuerza tambien
+ * la vista de mapa: si quedo abierta la lista, el mapa esta oculto y "ver en el
+ * mapa" no mostraria nada.
+ */
+function verEnElMapa(id, demora = 60) {
+  irA('mapa');
+  verComo('mapa');
+  setTimeout(() => mapa.centrarEn(id), demora);
+}
+
 function verComo(cual) {
   const esLista = cual === 'lista';
   $('#mapa-caja').hidden = esLista;
@@ -107,10 +121,11 @@ function alternarGps() {
     avisar(null);
     return;
   }
+  let apagado = false;
   estadoGps = 'buscando';
   $('#btn-ubicar').dataset.estado = 'buscando';
   avisar('Buscando tu ubicación…');
-  pararGps = geo.seguirUbicacion(
+  const parar = geo.seguirUbicacion(
     (u) => {
       const primera = estadoGps !== 'activo';
       estadoGps = 'activo';
@@ -130,17 +145,25 @@ function alternarGps() {
       if (!$('#lista-lugares').hidden) pintarLista();
     },
     (err) => {
-      estadoGps = 'error';
-      $('#btn-ubicar').dataset.estado = '';
-      pararGps = null;
       avisar({
         permiso: 'No nos diste permiso para usar tu ubicación. Podés activarla desde los ajustes del navegador.',
         demora: 'El GPS está tardando. Probá al aire libre, lejos de los edificios.',
         'sin-soporte': 'Este navegador no permite usar la ubicación.',
         'no-disponible': 'No pudimos obtener tu ubicación en este momento.',
       }[err] || 'No pudimos obtener tu ubicación.');
+      // Una demora es pasajera: el seguimiento sigue vivo y la proxima lectura
+      // puede llegar sola. Con el resto de los errores no hay nada que esperar,
+      // asi que lo apagamos: si no, cada toque al boton dejaba otro GPS prendido.
+      if (err === 'demora') return;
+      estadoGps = 'error';
+      $('#btn-ubicar').dataset.estado = '';
+      if (pararGps) pararGps();
+      pararGps = null;
+      apagado = true;
     },
   );
+  // si el error salto de entrada (sincronico), no dejamos el seguimiento colgado
+  if (apagado) parar(); else pararGps = parar;
 }
 
 function avisar(txt) {
@@ -269,8 +292,7 @@ function pintarLista() {
   cont.onclick = (e) => {
     const b = e.target.closest('.fila');
     if (!b) return;
-    verComo('mapa');
-    mapa.centrarEn(b.dataset.id);
+    verEnElMapa(b.dataset.id);
   };
 }
 
@@ -331,8 +353,7 @@ function pintarCronograma() {
   $('#bloques').onclick = (e) => {
     const b = e.target.closest('[data-sede]');
     if (!b) return;
-    irA('mapa');
-    setTimeout(() => mapa.centrarEn(b.dataset.sede), 60);
+    verEnElMapa(b.dataset.sede);
   };
 }
 
@@ -424,8 +445,7 @@ $('#atajos').addEventListener('click', (e) => {
 $('#resultados').addEventListener('click', (e) => {
   const b = e.target.closest('.fila');
   if (!b) return;
-  irA('mapa');
-  setTimeout(() => mapa.centrarEn(b.dataset.id), 60);
+  verEnElMapa(b.dataset.id);
 });
 
 // ===========================================================================
@@ -453,22 +473,55 @@ function pintarInfo() {
     </div>`);
   }
 
-  partes.push('<h2 class="lista-grupo">Teléfonos</h2>');
-  partes.push(CONTACTOS.map((c) => `
-    <div class="tarjeta ${c.urgente ? 'tarjeta-urgente' : ''}">
-      <div class="contacto ${c.urgente ? 'contacto-urgente' : ''}">
-        <div class="contacto-txt">
-          <h2>${esc(c.nombre)}</h2>
-          <p>${esc(c.detalle)}</p>
-          ${!c.tel ? '<p class="pendiente">Número a completar por la organización.</p>' : ''}
-        </div>
-        ${c.tel ? `<a class="contacto-tel" href="tel:${esc(c.tel.replace(/\s/g, ''))}">Llamar</a>` : ''}
-      </div>
-      ${c.lugar ? `<div class="ficha-acciones"><button type="button" class="btn-sec" data-lugar="${esc(c.lugar)}">Ver en el mapa</button></div>` : ''}
+  // Primero lo que alguien viene a buscar estando en el predio.
+  partes.push('<h2 class="lista-grupo">Lo que conviene saber</h2>');
+  partes.push(INFO.map((i) => `<div class="tarjeta">
+      <h2>${esc(i.titulo)}</h2>
+      <p>${esc(i.texto)}</p>
+      ${i.enlaces && i.enlaces.length ? `<p class="enlaces">${i.enlaces.map((l) =>
+        `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.texto)}</a>`).join('')}</p>` : ''}
+      ${i.lugar ? `<div class="ficha-acciones">
+        <button type="button" class="btn-sec" data-lugar="${esc(i.lugar)}">Ver en el mapa</button></div>` : ''}
     </div>`).join(''));
 
-  partes.push('<h2 class="lista-grupo">Lo que conviene saber</h2>');
-  partes.push(INFO.map((i) => `<div class="tarjeta"><h2>${esc(i.titulo)}</h2><p>${esc(i.texto)}</p></div>`).join(''));
+  // Solo los contactos que sirven para algo: con telefono para llamar o con un
+  // punto en el mapa al que ir. Una tarjeta que dice "numero a completar" no le
+  // resuelve nada a quien la esta leyendo en el predio.
+  const contactos = CONTACTOS.filter((c) => c.tel || c.lugar);
+  if (contactos.length) {
+    partes.push(`<h2 class="lista-grupo">${
+      contactos.some((c) => c.tel) ? 'Teléfonos y ayuda' : 'Dónde pedir ayuda'}</h2>`);
+    const puntos = todosLosPuntos();
+    partes.push(contactos.map((c) => {
+      // el mismo simbolo que tiene en el mapa, para reconocerlo de un vistazo
+      const p = c.lugar ? puntos.find((q) => q.id === c.lugar) : null;
+      return `
+      <div class="tarjeta ${c.urgente ? 'tarjeta-urgente' : ''}">
+        <div class="contacto ${c.urgente ? 'contacto-urgente' : ''}">
+          ${p ? `<span class="fila-icono" style="background:${TIPOS[p.tipo].color}">${icono(p.tipo)}</span>` : ''}
+          <div class="contacto-txt">
+            <h2>${esc(c.nombre)}</h2>
+            <p>${esc(c.detalle)}</p>
+          </div>
+          ${c.tel ? `<a class="contacto-tel" href="tel:${esc(c.tel.replace(/\s/g, ''))}">Llamar</a>` : ''}
+        </div>
+        ${c.lugar ? `<div class="ficha-acciones">
+          <button type="button" class="btn-sec" data-lugar="${esc(c.lugar)}">Ver en el mapa</button></div>` : ''}
+      </div>`;
+    }).join(''));
+  }
+
+  if (HERRAMIENTAS.length) {
+    partes.push('<h2 class="lista-grupo">Para practicar</h2>');
+    partes.push(HERRAMIENTAS.map((h) => `<div class="tarjeta">
+        <h2>${esc(h.nombre)}</h2>
+        <p>${esc(h.texto)}</p>
+        <div class="ficha-acciones">
+          <a class="btn-pri" href="${esc(h.url)}" target="_blank" rel="noopener noreferrer">${
+            esc(h.boton || 'Abrir')}</a>
+        </div>
+      </div>`).join(''));
+  }
 
   partes.push(`<h2 class="lista-grupo">Para imprimir</h2>
     <div class="tarjeta">
@@ -477,7 +530,7 @@ function pintarInfo() {
       qué servicios aparecen. Sirve para acreditaciones, para los ujieres y para quien no
       quiera depender del celular.</p>
       <div class="ficha-acciones">
-        <a class="btn-pri" href="imprimir.html" style="text-align:center;text-decoration:none;line-height:1.6">Armar el mapa para imprimir</a>
+        <a class="btn-pri" href="imprimir.html">Armar el mapa para imprimir</a>
       </div>
     </div>`);
 
@@ -496,10 +549,8 @@ function pintarInfo() {
   partes.push(`<p class="firma">
       Diseñado y desarrollado por
       <a href="${esc(CREDITOS.instagram)}" target="_blank" rel="noopener noreferrer">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.9.07 1.2.05 1.8.25 2.2.42.6.22 1 .48 1.4.9.43.42.7.83.92 1.4.17.42.37 1.05.42 2.24.06 1.28.07 1.66.07 4.88s0 3.6-.07 4.88c-.05 1.19-.25 1.82-.42 2.24-.22.57-.49.98-.91 1.4-.42.42-.83.69-1.4.91-.42.17-1.05.37-2.24.42-1.28.06-1.66.07-4.88.07s-3.6 0-4.88-.07c-1.19-.05-1.82-.25-2.24-.42a3.8 3.8 0 0 1-1.4-.91 3.8 3.8 0 0 1-.91-1.4c-.17-.42-.37-1.05-.42-2.24C2.2 15.6 2.2 15.22 2.2 12s0-3.6.07-4.88c.05-1.19.25-1.82.42-2.24.22-.57.49-.98.91-1.4.42-.42.83-.69 1.4-.91.42-.17 1.05-.37 2.24-.42C8.4 2.2 8.8 2.2 12 2.2Zm0 1.8c-3.16 0-3.5 0-4.74.07-.9.04-1.38.19-1.7.31-.43.17-.73.37-1.05.69-.32.32-.52.62-.69 1.05-.12.32-.27.8-.31 1.7C3.44 8.5 3.43 8.84 3.43 12s0 3.5.08 4.74c.4.9.19 1.38.31 1.7.17.43.37.73.69 1.05.32.32.62.52 1.05.69.32.12.8.27 1.7.31 1.24.06 1.58.07 4.74.07s3.5 0 4.74-.07c.9-.04 1.38-.19 1.7-.31.43-.17.73-.37 1.05-.69.32-.32.52-.62.69-1.05.12-.32.27-.8.31-1.7.06-1.24.07-1.58.07-4.74s0-3.5-.07-4.74c-.04-.9-.19-1.38-.31-1.7a2.8 2.8 0 0 0-.69-1.05 2.8 2.8 0 0 0-1.05-.69c-.32-.12-.8-.27-1.7-.31C15.5 4 15.16 4 12 4Zm0 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 1.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4Zm5.2-3.1a1.17 1.17 0 1 1 0 2.34 1.17 1.17 0 0 1 0-2.34Z"/></svg>
-        ${esc(CREDITOS.usuario)}
-      </a>
-      <span class="firma-para">para ${esc(CREDITOS.para)}</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.9.07 1.2.05 1.8.25 2.2.42.6.22 1 .48 1.4.9.43.42.7.83.92 1.4.17.42.37 1.05.42 2.24.06 1.28.07 1.66.07 4.88s0 3.6-.07 4.88c-.05 1.19-.25 1.82-.42 2.24-.22.57-.49.98-.91 1.4-.42.42-.83.69-1.4.91-.42.17-1.05.37-2.24.42-1.28.06-1.66.07-4.88.07s-3.6 0-4.88-.07c-1.19-.05-1.82-.25-2.24-.42a3.8 3.8 0 0 1-1.4-.91 3.8 3.8 0 0 1-.91-1.4c-.17-.42-.37-1.05-.42-2.24C2.2 15.6 2.2 15.22 2.2 12s0-3.6.07-4.88c.05-1.19.25-1.82.42-2.24.22-.57.49-.98.91-1.4.42-.42.83-.69 1.4-.91.42-.17 1.05-.37 2.24-.42C8.4 2.2 8.8 2.2 12 2.2Zm0 1.8c-3.16 0-3.5 0-4.74.07-.9.04-1.38.19-1.7.31-.43.17-.73.37-1.05.69-.32.32-.52.62-.69 1.05-.12.32-.27.8-.31 1.7C3.44 8.5 3.43 8.84 3.43 12s0 3.5.08 4.74c.4.9.19 1.38.31 1.7.17.43.37.73.69 1.05.32.32.62.52 1.05.69.32.12.8.27 1.7.31 1.24.06 1.58.07 4.74.07s3.5 0 4.74-.07c.9-.04 1.38-.19 1.7-.31.43-.17.73-.37 1.05-.69.32-.32.52-.62.69-1.05.12-.32.27-.8.31-1.7.06-1.24.07-1.58.07-4.74s0-3.5-.07-4.74c-.04-.9-.19-1.38-.31-1.7a2.8 2.8 0 0 0-.69-1.05 2.8 2.8 0 0 0-1.05-.69c-.32-.12-.8-.27-1.7-.31C15.5 4 15.16 4 12 4Zm0 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 1.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4Zm5.2-3.1a1.17 1.17 0 1 1 0 2.34 1.17 1.17 0 0 1 0-2.34Z"/></svg><span>${esc(CREDITOS.usuario)}</span></a>
+      para <b>${esc(CREDITOS.para)}</b>
       <small>${esc(CREDITOS.organizacion)}.<br>
       Ilustración del predio: República de los Niños. Calles: © colaboradores de OpenStreetMap.</small>
     </p>`);
@@ -508,17 +559,17 @@ function pintarInfo() {
 
   const verSede = $('#info-ver-sede');
   if (verSede) verSede.addEventListener('click', () => {
-    irA('mapa');
-    setTimeout(() => mapa.centrarEn('org-' + o.sigla.toLowerCase()), 60);
+    verEnElMapa('org-' + o.sigla.toLowerCase());
   });
   const cambiar = $('#info-cambiar');
   if (cambiar) cambiar.addEventListener('click', abrirPerfil);
-  $('#info-contenido').addEventListener('click', (e) => {
+  // onclick y no addEventListener: pintarInfo() se llama cada vez que se entra
+  // a la seccion, y con addEventListener se iban apilando copias del mismo oyente
+  $('#info-contenido').onclick = (e) => {
     const b = e.target.closest('[data-lugar]');
     if (!b) return;
-    irA('mapa');
-    setTimeout(() => mapa.centrarEn(b.dataset.lugar), 60);
-  });
+    verEnElMapa(b.dataset.lugar);
+  };
 }
 
 // ===========================================================================
@@ -548,8 +599,7 @@ $('#modal-perfil').addEventListener('close', () => {
   if ($('#modal-perfil').returnValue === 'guardar') {
     guardarPerfil({ organo: elegido.organo, listo: true });
     if (elegido.organo && mapa) {
-      irA('mapa');
-      setTimeout(() => mapa.centrarEn('org-' + elegido.organo.toLowerCase()), 120);
+      verEnElMapa('org-' + elegido.organo.toLowerCase(), 120);
     }
   } else {
     guardarPerfil({ listo: true });
@@ -584,33 +634,36 @@ alCambiarPerfil(() => {
 // ===========================================================================
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 const DURACION_PORTADA = 1450;   // lo que dura splash.webp, en ms
+const TOPE_PORTADA = 7000;       // pase lo que pase, a los 7 s la portada se va
 
 function portada() {
   const el = $('#portada');
   if (!el) return Promise.resolve();
   const img = $('#portada-anim');
   const menosMovimiento = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let urlBlob = null;
 
-  // El <img> ya apunta al webp animado, asi que arranca en el primer cuadro
-  // (vacio) y se dibuja solo. Con menos movimiento pedido, mostramos el logo
-  // terminado y listo.
-  if (menosMovimiento) {
-    img.src = 'img/splash-fijo.webp';
-  } else {
-    // Reiniciamos la animacion a mano: un webp animado que ya corrio su unica
-    // vuelta no vuelve a arrancar cuando la pagina se recarga desde el cache.
-    // Sacar y volver a poner el src la reinicia sin volver a descargarla.
-    const url = img.getAttribute('src');
-    img.removeAttribute('src');
-    void img.offsetWidth;
-    img.setAttribute('src', url);
+  /** Pone una imagen y avisa cuando termino de cargar (o de fallar). */
+  function mostrar(url) {
+    return new Promise((res) => {
+      img.addEventListener('load', res, { once: true });
+      img.addEventListener('error', res, { once: true });
+      img.src = url;
+    });
   }
 
-  const animacionLista = new Promise((res) => {
-    if (img.complete && img.naturalWidth) { res(); return; }
-    img.addEventListener('load', res, { once: true });
-    img.addEventListener('error', res, { once: true });
-  });
+  // Un webp animado con una sola vuelta no vuelve a empezar si el navegador
+  // reusa la imagen que ya tiene decodificada: se ve el ultimo cuadro, quieto,
+  // como si la animacion nunca hubiera ocurrido. Con un blob distinto en cada
+  // carga siempre arranca del primer cuadro. El archivo no se vuelve a bajar:
+  // el <link rel=preload> del index ya lo dejo en el cache.
+  const dibujada = menosMovimiento
+    ? mostrar('img/splash-fijo.webp')
+    // credentials omit para que coincida con el <link rel=preload> del index
+    : fetch('img/splash.webp', { credentials: 'omit' })
+        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('splash'))))
+        .then((b) => { urlBlob = URL.createObjectURL(b); return mostrar(urlBlob); })
+        .catch(() => mostrar('img/splash.webp'));
 
   const mapaListo = new Promise((res) => {
     const fondo = $('#mapa-fondo');
@@ -619,19 +672,28 @@ function portada() {
     fondo.addEventListener('error', res, { once: true });
   });
 
-  // Esperamos a que la animacion este descargada (con tope, para no dejar la
-  // app trabada si la red esta mal) y recien ahi le damos su tiempo completo.
-  return Promise.race([animacionLista, espera(2500)])
+  const secuencia = dibujada
     .then(() => {
       if (menosMovimiento) return espera(500);
-      // el webp dura 1,4 s; le damos ese tiempo desde que se pudo empezar a ver
-      return Promise.all([espera(DURACION_PORTADA), mapaListo]);
+      // el webp dura 1,4 s; le damos ese tiempo desde que se lo pudo ver, y de
+      // paso esperamos al mapa para no mostrar un recuadro vacio. Con tope: la
+      // app se abre muchas veces por dia, no puede tardar mas que eso.
+      return Promise.all([espera(DURACION_PORTADA),
+                          Promise.race([mapaListo, espera(1500)])]);
     })
     .then(() => {
       el.classList.add('saliendo');
       return espera(menosMovimiento ? 0 : 450);
-    })
-    .then(() => { el.hidden = true; });
+    });
+
+  // El tope no es decorativo: si algo de esto se cuelga, la app tiene que
+  // aparecer igual. Una portada trabada equivale a una app rota.
+  return Promise.race([secuencia, espera(TOPE_PORTADA)])
+    .catch(() => {})
+    .then(() => {
+      el.hidden = true;
+      if (urlBlob) URL.revokeObjectURL(urlBlob);
+    });
 }
 
 // ===========================================================================
@@ -651,7 +713,31 @@ portadaTerminada.then(() => {
   if (!obtenerPerfil().listo) setTimeout(abrirPerfil, 260);
 });
 
-if ('serviceWorker' in navigator) {
+// ---------------------------------------------------------- service worker
+//
+// En desarrollo NO se registra. El cache del service worker no respeta las
+// cabeceras del servidor, asi que en localhost termina sirviendo archivos
+// viejos y uno persigue errores que ya estaban corregidos. Ahi tambien se
+// borra el que hubiera quedado de antes. Para probar el modo sin senal, usar
+// el sitio publicado.
+const ES_DESARROLLO = ['localhost', '127.0.0.1', '::1', ''].includes(location.hostname);
+
+if ('serviceWorker' in navigator && ES_DESARROLLO) {
+  navigator.serviceWorker.getRegistrations()
+    .then((rs) => Promise.all(rs.map((r) => r.unregister())))
+    .then(() => (self.caches ? caches.keys().then((ks) => Promise.all(ks.map((k) => caches.delete(k)))) : null))
+    .catch(() => {});
+} else if ('serviceWorker' in navigator) {
+  // Si ya habia una version corriendo y entra a mandar una nueva, recargamos
+  // una sola vez para quedar con todo de la misma version. Solo si la pagina
+  // recien se abrio: recargarle la app a alguien que la esta usando, no.
+  const yaHabia = !!navigator.serviceWorker.controller;
+  let recargando = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!yaHabia || recargando || performance.now() > 12000) return;
+    recargando = true;
+    location.reload();
+  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });

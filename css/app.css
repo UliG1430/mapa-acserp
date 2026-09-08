@@ -154,7 +154,15 @@ button, input { font: inherit; color: inherit; }
   gap: 10px;
   z-index: 20;
 }
-.cabecera-logo { width: 34px; height: 34px; flex: 0 0 auto; }
+/* el logo lleva de vuelta al mapa: la zona tocable es mayor que el dibujo */
+.cabecera-inicio {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: var(--tap); height: var(--tap); margin-left: -5px;
+  padding: 0; border: 0; border-radius: 50%;
+  background: none; color: inherit; cursor: pointer;
+}
+.cabecera-inicio:active { background: rgba(255, 255, 255, .14); }
+.cabecera-logo { width: 34px; height: 34px; flex: 0 0 auto; display: block; }
 .cabecera-txt { min-width: 0; flex: 1; }
 .cabecera-titulo { margin: 0; font-weight: 700; font-size: 1.02rem; letter-spacing: .02em; }
 .cabecera-sub {
@@ -537,6 +545,8 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
 }
 .btn-pri { background: var(--navy); color: #fff; }
 .btn-sec { background: var(--papel-2); color: var(--tinta); border-color: var(--borde); }
+/* los mismos botones cuando en realidad son un enlace */
+a.btn-pri, a.btn-sec { text-decoration: none; display: grid; place-items: center; }
 
 /* --------------------------------------------------------------- lista */
 .lista-lugares { flex: 1 1 auto; overflow-y: auto; padding: 8px 10px 16px; }
@@ -692,23 +702,36 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
   display: grid; place-items: center;
 }
 .contacto-urgente .contacto-tel { background: var(--alerta); }
-.pendiente { font-size: .82rem; color: var(--tinta-2); font-style: italic; }
 
+/* enlaces sueltos dentro de una tarjeta */
+.tarjeta .enlaces { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 9px; }
+.tarjeta .enlaces a {
+  color: var(--acento); font-weight: 700; font-size: .9rem;
+  text-decoration: underline; text-underline-offset: 3px;
+  min-height: 32px; display: inline-flex; align-items: center;
+}
+
+/* Una sola frase corrida, no un boton en el medio del texto: el credito
+   acompana, no interrumpe. El padding vertical del enlace no cambia como se ve
+   (es un elemento en linea) pero le agranda la zona tocable. */
 .firma {
   margin: 18px 0 4px; padding-top: 14px;
   border-top: 1px solid var(--borde);
-  text-align: center; font-size: .82rem; color: var(--tinta-2);
+  text-align: center; font-size: .84rem; line-height: 1.8; color: var(--tinta-2);
+  text-wrap: balance;
 }
+.firma b { color: var(--tinta); font-weight: 700; }
 .firma a {
-  display: inline-flex; align-items: center; gap: 6px;
-  min-height: var(--tap); padding: 8px 14px;
-  margin-top: 4px;
-  border-radius: 999px; border: 1px solid var(--borde);
-  background: var(--papel); color: var(--tinta);
-  text-decoration: none; font-weight: 700;
+  color: var(--acento); font-weight: 700; white-space: nowrap;
+  text-decoration: none;
+  padding: 11px 2px; margin: -11px 0;
 }
-.firma svg { width: 18px; height: 18px; fill: currentColor; }
-.firma-para { display: block; margin-top: 6px; font-weight: 700; color: var(--tinta); }
+/* el subrayado va solo en el nombre, no debajo del icono */
+.firma a span { text-decoration: underline; text-underline-offset: 3px; }
+.firma svg {
+  width: 1em; height: 1em; fill: currentColor;
+  vertical-align: -.14em; margin-right: .28em;
+}
 .firma small { display: block; margin-top: 10px; font-size: .74rem; line-height: 1.5; }
 
 /* ------------------------------------------------------------------ tabbar */

@@ -80,7 +80,7 @@ body { display: block; background: var(--papel-3); }
 .hoja-mapa { position: relative; flex: 0 0 auto; }
 .hoja[data-orient="apaisado"] .hoja-mapa { width: 186mm; height: 186mm; }
 .hoja[data-orient="vertical"] .hoja-izq { padding: 6mm 7mm 3mm; }
-.hoja[data-orient="vertical"] .hoja-mapa { width: 170mm; height: 170mm; margin: 0 auto; }
+.hoja[data-orient="vertical"] .hoja-mapa { width: 158mm; height: 158mm; margin: 0 auto; }
 .hoja-mapa img { width: 100%; height: 100%; display: block; border-radius: 2mm; }
 
 .hoja-lado {
@@ -89,6 +89,7 @@ body { display: block; background: var(--papel-3); }
   padding: 7mm 7mm 6mm 6mm;
 }
 .hoja[data-orient="vertical"] .hoja-lado { padding: 0 7mm 6mm; flex: 1 1 auto; }
+.hoja[data-orient="vertical"] .hoja-titulo { margin-bottom: 2.5mm; }
 
 .hoja-titulo { display: flex; align-items: center; gap: 4mm; margin-bottom: 3.5mm; }
 .hoja-titulo img { width: 22mm; height: 22mm; flex: 0 0 auto; }
@@ -116,7 +117,7 @@ body { display: block; background: var(--papel-3); }
   display: flex; align-items: flex-start; gap: 2mm;
   margin-bottom: 1.4mm; break-inside: avoid; line-height: 1.25;
 }
-.ref > span { padding-top: .8mm; }
+.ref > span:not(.pi-punto) { padding-top: .8mm; }
 .ref img { width: 6mm; height: 6mm; border-radius: 50%; flex: 0 0 auto; }
 .ref .pi-punto { width: 6mm; height: 6mm; }
 .ref .pi-punto svg { width: 3.6mm; height: 3.6mm; }
@@ -146,6 +147,18 @@ body { display: block; background: var(--papel-3); }
 .hoja-qr i { display: block; margin-top: 1.4mm; font-size: 2.7mm; font-style: normal; color: #4b5060; }
 
 .hm { position: absolute; transform: translate(-50%, -50%); text-align: center; }
+.hm-aqui {
+  transform: translate(-50%, -100%);      /* la punta del pin va sobre el lugar */
+  z-index: 3;
+}
+.hm-aqui svg { width: 9mm; height: 12.7mm; display: block; margin: 0 auto;
+  filter: drop-shadow(0 .3mm .6mm rgba(0, 0, 0, .45)); }
+.hm-aqui .hm-rot {
+  position: static; display: inline-block; margin-top: .6mm;
+  background: #b0113a; color: #fff; font-size: 2.6mm; letter-spacing: .04em;
+  padding: .5mm 1.4mm; border-radius: 1mm;
+}
+.mapa-clic { cursor: crosshair; }
 .hm-disco {
   width: 7mm; height: 7mm; border-radius: 50%;
   border: .5mm solid #fff; box-shadow: 0 .3mm .8mm rgba(0, 0, 0, .4);
@@ -202,6 +215,10 @@ body { display: block; background: var(--papel-3); }
       </select>
     </label>
     <p class="pi-mini" id="aviso-cols"></p>
+
+    <h2>Punto de referencia</h2>
+    <label class="pi-op"><input type="checkbox" id="op-aqui"> Marcar «Estás acá»</label>
+    <p class="pi-mini" id="aqui-aviso">Sirve para imprimir un cartel para cada lugar del predio.</p>
 
     <h2>Código QR</h2>
     <label class="pi-op"><input type="checkbox" id="op-qr"> Ponerlo sobre el mapa</label>
@@ -267,7 +284,14 @@ const estado = {
   organos: new Set(ORGANOS.map((o) => o.sigla)),
   rotulos: true,
   cols: 'auto',
+  aqui: null,                                  // {x, y} del punto «estás acá»
 };
+
+const CLAVE_AQUI = 'minulp2026.puntoAqui';
+try {
+  const g = localStorage.getItem(CLAVE_AQUI);
+  if (g) estado.aqui = JSON.parse(g);
+} catch (e) { /* sin storage: se marca cada vez */ }
 
 // ------------------------------------------------------------------ panel
 $('#grupos').innerHTML = GRUPOS.map((g) => `
@@ -314,6 +338,43 @@ $('#op-oficial').addEventListener('change', (e) => {
 });
 $('#op-rotulos').addEventListener('change', (e) => { estado.rotulos = e.target.checked; pintar(); });
 $('#op-cols').addEventListener('change', (e) => { estado.cols = e.target.value; pintar(); });
+
+// -------------------------------------------------------- punto «estás acá»
+$('#op-aqui').addEventListener('change', (e) => {
+  $('.hoja-mapa').classList.toggle('mapa-clic', e.target.checked);
+  if (!e.target.checked) {
+    estado.aqui = null;
+    try { localStorage.removeItem(CLAVE_AQUI); } catch (err) { /* nada */ }
+  }
+  pintar();
+  avisarAqui();
+});
+
+$('.hoja-mapa').addEventListener('click', (e) => {
+  if (!$('#op-aqui').checked) return;
+  // getBoundingClientRect ya viene con el scale del preview aplicado, asi que
+  // la fraccion sale bien sin tener que compensar nada
+  const r = $('.hoja-mapa').getBoundingClientRect();
+  estado.aqui = {
+    x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+    y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
+  };
+  try { localStorage.setItem(CLAVE_AQUI, JSON.stringify(estado.aqui)); } catch (err) { /* nada */ }
+  pintar();
+  avisarAqui();
+});
+
+function avisarAqui() {
+  $('#aqui-aviso').textContent = !$('#op-aqui').checked
+    ? 'Sirve para imprimir un cartel para cada lugar del predio.'
+    : (estado.aqui ? 'Tocá el mapa otra vez para moverlo.'
+                   : 'Ahora tocá el mapa donde va a estar el cartel.');
+}
+if (estado.aqui) {
+  $('#op-aqui').checked = true;
+  $('.hoja-mapa').classList.add('mapa-clic');
+}
+avisarAqui();
 $('#btn-imprimir').addEventListener('click', () => window.print());
 
 // ------------------------------------------------------------------- QR
@@ -379,14 +440,23 @@ function acomodarRotulos(nodos) {
   const choca = (c) => puestos.some((o) => !(c.der < o.izq || c.izq > o.der ||
                                              c.aba < o.arr || c.arr > o.aba));
   const base = $('#hoja-marcas').getBoundingClientRect();
+  const caja = (el) => {
+    const r = el.getBoundingClientRect();
+    return { izq: r.left - base.left, der: r.right - base.left,
+             arr: r.top - base.top, aba: r.bottom - base.top };
+  };
+
+  // El pin «estás acá» no se mueve: es el punto del cartel y tiene que quedar
+  // donde se marcó. Se reserva su lugar para que las siglas lo esquiven.
+  const pin = $('.hm-aqui');
+  if (pin) puestos.push(caja(pin));
+
   for (const { nodo, rot } of nodos) {
-    if (!rot) continue;
+    if (!rot || nodo.classList.contains('hm-aqui')) continue;
     const opciones = [0, 12, -20, 24, -32, 36];
     for (const dy of opciones) {
       rot.style.marginTop = (dy / 3.78) + 'mm';           // px -> mm aprox
-      const r = rot.getBoundingClientRect();
-      const c = { izq: r.left - base.left, der: r.right - base.left,
-                  arr: r.top - base.top, aba: r.bottom - base.top };
+      const c = caja(rot);
       if (!choca(c) || dy === opciones[opciones.length - 1]) { puestos.push(c); break; }
     }
   }
@@ -411,6 +481,19 @@ function pintar() {
             </div>`;
   }).join('');
 
+  if (estado.aqui) {
+    const pin = document.createElement('div');
+    pin.className = 'hm hm-aqui';
+    pin.style.left = (estado.aqui.x * 100).toFixed(2) + '%';
+    pin.style.top = (estado.aqui.y * 100).toFixed(2) + '%';
+    pin.innerHTML =
+      '<svg viewBox="0 0 24 34" fill="#b0113a" aria-hidden="true">' +
+      '<path d="M12 0a12 12 0 0 0-12 12c0 8.9 12 22 12 22s12-13.1 12-22A12 12 0 0 0 12 0Z"/>' +
+      '<circle cx="12" cy="12" r="4.6" fill="#fff"/></svg>' +
+      '<span class="hm-rot">ESTÁS ACÁ</span>';
+    $('#hoja-marcas').appendChild(pin);
+  }
+
   requestAnimationFrame(() => acomodarRotulos(
     [...$('#hoja-marcas').children].map((nodo) => ({ nodo, rot: nodo.querySelector('.hm-rot') }))));
 
@@ -423,6 +506,14 @@ function pintar() {
         <img src="img/logos/${o.sigla}.webp" alt="">
         <span><b>${esc(o.sigla)}</b> · ${esc(o.sede)}</span></div>`).join('')}</div>`);
   }
+  if (estado.aqui) {
+    bloques.push('<div class="refs-grupo"><p>Referencia</p>' +
+      '<div class="ref"><span class="pi-punto" style="background:#b0113a">' +
+      '<svg viewBox="0 0 24 34"><path d="M12 0a12 12 0 0 0-12 12c0 8.9 12 22 12 22s12-13.1 12-22' +
+      'A12 12 0 0 0 12 0Z"/><circle cx="12" cy="12" r="4.6" fill="#b0113a"/></svg></span>' +
+      '<span><b>Estás acá</b></span></div></div>');
+  }
+
   const porTipo = new Map();
   lista.filter((p) => !p.organo).forEach((p) => {
     porTipo.set(p.tipo, (porTipo.get(p.tipo) || 0) + 1);

@@ -3,7 +3,7 @@
 //  Se guarda en el navegador; no viaja a ningun servidor.
 // ============================================================================
 
-import { ORGANOS, LUGARES } from './datos.js';
+import { ORGANOS } from './datos.js';
 
 const CLAVE = 'minulp2026.perfil';
 
@@ -38,12 +38,6 @@ export function alCambiarPerfil(f) {
 /** El organo elegido, o null. */
 export function miOrgano() {
   return ORGANOS.find((o) => o.sigla === perfil.organo) || null;
-}
-
-/** El lugar donde sesiona mi organo, o null. */
-export function miSede() {
-  const o = miOrgano();
-  return o ? LUGARES.find((l) => l.id === o.sede) || null : null;
 }
 
 /** Que columna del cronograma me toca: 'sti' | 'cs' | 'asamblearios' | null */

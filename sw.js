@@ -1,9 +1,17 @@
 // ============================================================================
 //  sw.js — cache offline. La app entera pesa ~1 MB, asi que la guardamos toda.
 //  Al publicar una version nueva, cambiar VERSION: eso invalida el cache viejo.
+//
+//  REGLA DE ORO: una carga tiene que servirse ENTERA de la misma version.
+//  Antes el html se pedia a la red y el resto salia del cache, asi que despues
+//  de publicar un cambio quedaba el html nuevo con el javascript y las imagenes
+//  viejas. Eso se veia como cosas raras que "se arreglaban recargando": un logo
+//  de una version anterior, una animacion que no arrancaba, la app trabada en
+//  la portada. Ahora todo sale del cache y de fondo se busca lo nuevo, que
+//  queda listo para la proxima vez (app.js recarga solo si recien abriste).
 // ============================================================================
 
-const VERSION = 'minulp-2026-v6';
+const VERSION = 'minulp-2026-v11';
 
 const ARCHIVOS = [
   './',
@@ -60,29 +68,18 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
 
-  // navegacion: red primero para tomar actualizaciones, cache si no hay senal
-  if (req.mode === 'navigate') {
-    e.respondWith(
-      fetch(req)
-        .then((r) => {
-          const copia = r.clone();
-          caches.open(VERSION).then((c) => c.put(req, copia));
-          return r;
-        })
-        .catch(() => caches.match(req).then((r) => r || caches.match('index.html'))),
-    );
-    return;
-  }
-
-  // El resto: servimos del cache (por eso anda sin senal) y de fondo pedimos
-  // la version nueva. Asi, si se publica una correccion, la proxima vez que
-  // alguien abra la app ya la tiene, sin necesidad de borrar nada a mano.
+  // Servimos del cache (por eso anda sin senal) y de fondo pedimos la version
+  // nueva. Asi, si se publica una correccion, la proxima vez que alguien abra
+  // la app ya la tiene, sin necesidad de borrar nada a mano.
   e.respondWith(
     caches.open(VERSION).then((cache) => cache.match(req).then((hit) => {
-      const red = fetch(req).then((r) => {
-        if (r && r.ok) cache.put(req, r.clone());
-        return r;
-      }).catch(() => hit);
+      const red = fetch(req)
+        .then((r) => {
+          if (r && r.ok) cache.put(req, r.clone());
+          return r;
+        })
+        // sin senal y sin copia: si es una navegacion, al menos damos la portada
+        .catch(() => hit || (req.mode === 'navigate' ? caches.match('index.html') : undefined));
       return hit || red;
     })),
   );

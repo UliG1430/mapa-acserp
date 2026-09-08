@@ -159,9 +159,21 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
   let ubic = null;
   let escalaPantalla = 1;
   let tocado = false;   // ya intervino la persona? entonces no reencuadramos solos
+  let pendiente = null; // encuadre pedido mientras el mapa estaba oculto
 
+  /**
+   * Mide el visor y recalcula los limites de zoom. Devuelve null si el mapa no
+   * esta a la vista.
+   *
+   * Con la lista abierta el mapa esta oculto y mide 0x0, y eso no es una medida
+   * sino la ausencia de una: guardarla dejaba zMin y zMax en cero, y entonces el
+   * primer centrado al volver recortaba el zoom a cero. El dibujo se encogia
+   * hasta desaparecer y uno quedaba mirando la nada. Mejor conservar la ultima
+   * medida buena y no hacer nada hasta que haya algo que medir.
+   */
   function medir() {
     const r = raiz.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
     zMin = Math.min(r.width, r.height) / MAPA_PX;
     zMax = zMin * 7;
     // se puede alejar hasta abarcar tambien las calles de alrededor
@@ -189,6 +201,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
     // El lienzo va de -ENTORNO_PX a MAPA_PX + ENTORNO_PX: se puede salir del
     // dibujo y seguir viendo las calles de afuera, pero no perderse en el vacio.
     const r = raiz.getBoundingClientRect();
+    if (!r.width || !r.height) return;
     const min = -ENTORNO_PX * z;
     const max = (MAPA_PX + ENTORNO_PX) * z;
     const margen = Math.min(r.width, r.height) * 0.3;
@@ -198,6 +211,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
 
   function encuadrar() {
     const r = medir();
+    if (!r) return;
     z = zMin;
     tx = (r.width - MAPA_PX * z) / 2;
     ty = (r.height - MAPA_PX * z) / 2;
@@ -209,12 +223,14 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
   const CENTRO_PREDIO = { x: 0.49, y: 0.47 };
   function vistaInicial() {
     const r = medir();
+    if (!r) return;
     centrar(CENTRO_PREDIO.x, CENTRO_PREDIO.y,
             Math.max(zMin, Math.max(r.width, r.height) / MAPA_PX));
   }
 
   function zoomA(nuevoZ, cx, cy) {
-    const r = raiz.getBoundingClientRect();
+    const r = medir();
+    if (!r) return;
     if (cx === undefined) { cx = r.width / 2; cy = r.height / 2; }
     const nz = Math.min(zMax, Math.max(zPiso, nuevoZ));
     tx = cx - ((cx - tx) / z) * nz;
@@ -226,7 +242,10 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
 
   /** Lleva un punto del mapa (fracciones 0..1) al centro de la pantalla. */
   function centrar(fx, fy, zObjetivo) {
-    const r = raiz.getBoundingClientRect();
+    const r = medir();
+    // Puede pedirse un destino con el mapa oculto: desde la lista, o desde Info
+    // con la lista abierta. Nos guardamos el pedido y lo cumplimos apenas se vea.
+    if (!r) { pendiente = { fx, fy, z: zObjetivo }; return; }
     if (zObjetivo) z = Math.min(zMax, Math.max(zPiso, zObjetivo));
     tx = r.width / 2 - fx * MAPA_PX * z;
     ty = r.height / 2 - fy * MAPA_PX * z;
@@ -243,6 +262,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
     const p = puntos.find((q) => q.id === id);
     if (!p) return;
     const r = raiz.getBoundingClientRect();
+    if (!r.width || !r.height) return;
     const sx = tx + p.x * MAPA_PX * z;
     const sy = ty + p.y * MAPA_PX * z;
     const m = 56;
@@ -261,17 +281,34 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
   }
 
   // -------------------------------------------------- gestos (pointer events)
+  //
+  // OJO CON LA CAPTURA DEL PUNTERO. Si el contenedor la toma al apoyar el dedo,
+  // el navegador le redirige TODOS los eventos que siguen, incluido el click, y
+  // los marcadores dejan de poder tocarse: el click nunca llega al boton. Por eso
+  // la captura se pide recien cuando el dedo se movio de verdad, que es cuando
+  // hace falta seguirlo aunque se salga del mapa.
   const activos = new Map();
+  const capturados = new Set();
   let arrastre = null, pellizco = null, movio = false, ultimoTap = 0;
+
+  function capturar(id) {
+    if (capturados.has(id)) return;
+    try { raiz.setPointerCapture(id); capturados.add(id); } catch (e) { /* ya se levanto */ }
+  }
+  function liberar(id) {
+    if (!capturados.delete(id)) return;
+    try { raiz.releasePointerCapture(id); } catch (e) { /* ya se libero solo */ }
+  }
 
   raiz.addEventListener('pointerdown', (e) => {
     tocado = true;
-    raiz.setPointerCapture(e.pointerId);
     activos.set(e.pointerId, { x: e.clientX, y: e.clientY });
     movio = false;
     if (activos.size === 1) {
       arrastre = { x: e.clientX, y: e.clientY, tx, ty };
     } else if (activos.size === 2) {
+      // en el pellizco no hay click que preservar: capturamos los dos dedos ya
+      activos.forEach((_, id) => capturar(id));
       const [a, b] = [...activos.values()];
       pellizco = {
         d: Math.hypot(a.x - b.x, a.y - b.y),
@@ -304,7 +341,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
     } else if (arrastre) {
       const dx = e.clientX - arrastre.x;
       const dy = e.clientY - arrastre.y;
-      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) movio = true;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) { movio = true; capturar(e.pointerId); }
       tx = arrastre.tx + dx;
       ty = arrastre.ty + dy;
       limitar();
@@ -314,10 +351,15 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
 
   function soltar(e) {
     activos.delete(e.pointerId);
+    liberar(e.pointerId);
     if (activos.size < 2) pellizco = null;
     if (activos.size === 0) {
       arrastre = null;
-      if (!movio && e.target === raiz) {
+      // Sin captura, el destino es el elemento real que se toco. Un toque sobre
+      // un marcador lo resuelve el propio boton; aca solo nos ocupamos de los
+      // toques en el mapa vacio.
+      const sobreAlgo = e.target instanceof Element && e.target.closest('.marca, .yo-borde');
+      if (!movio && !sobreAlgo) {
         const ahora = Date.now();
         if (ahora - ultimoTap < 320) {
           const r = raiz.getBoundingClientRect();
@@ -421,7 +463,12 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
     const dir = direccionHacia(centro.px, centro.py, ubic.lat, ubic.lon);
     const dx = dir.dx;
     const dy = dir.dy;
-    if (!dx && !dy) { borde.hidden = true; return; }
+    // estas practicamente sobre el centro: no hay direccion que mostrar
+    if (!dx && !dy) {
+      borde.hidden = true;
+      if (alQuedarFuera) alQuedarFuera(false, 0);
+      return;
+    }
     const hw = Math.max(12, cx - m);
     const hh = Math.max(12, cy - m);
     const k = Math.min(hw / Math.max(Math.abs(dx), 1e-6), hh / Math.max(Math.abs(dy), 1e-6));
@@ -439,7 +486,8 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
 
   /** Encuadra una caja dada en pixeles del mapa, con aire alrededor. */
   function encuadrarCaja(x0, y0, x1, y1) {
-    const r = raiz.getBoundingClientRect();
+    const r = medir();
+    if (!r) return;
     x0 = Math.max(-ENTORNO_PX, x0); y0 = Math.max(-ENTORNO_PX, y0);
     x1 = Math.min(MAPA_PX + ENTORNO_PX, x1); y1 = Math.min(MAPA_PX + ENTORNO_PX, y1);
     const pad = 46;
@@ -516,8 +564,13 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
   // El alto real del mapa no se conoce hasta que el navegador termina de armar
   // la pagina, asi que mientras nadie lo haya tocado rehacemos el encuadre.
   const ro = new ResizeObserver(() => {
-    medir();
-    if (!tocado) vistaInicial(); else { limitar(); aplicar(); }
+    if (!medir()) return;                  // oculto: no hay nada que medir
+    if (pendiente) {                       // habia un destino esperando
+      const p = pendiente;
+      pendiente = null;
+      centrar(p.fx, p.fy, p.z);
+    } else if (!tocado) vistaInicial();
+    else { limitar(); aplicar(); }
   });
   ro.observe(raiz);
   vistaInicial();
@@ -537,6 +590,20 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
     },
     seleccionar,
     asegurarVisible,
+    /**
+     * Cambia de lugar un punto ya dibujado. Lo usa editor.html para acomodar
+     * sedes sin tener que editar datos.js a ciegas y recargar cada vez.
+     */
+    moverPunto(id, fx, fy) {
+      const p = puntos.find((q) => q.id === id);
+      const nodo = nodos.get(id);
+      if (!p || !nodo) return null;
+      p.x = Math.max(0, Math.min(1, fx));
+      p.y = Math.max(0, Math.min(1, fy));
+      nodo.style.left = (p.x * 100) + '%';
+      nodo.style.top = (p.y * 100) + '%';
+      return { x: p.x, y: p.y };
+    },
     seleccionActual: () => seleccion,
     setFiltros(nuevos) { filtros = new Set(nuevos); aplicarFiltros(); },
     setFondo(cual) {

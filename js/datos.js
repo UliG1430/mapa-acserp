@@ -191,10 +191,15 @@ export const CRONOGRAMA = [
 
 /* ---------------------------------------------------------------------------
    CONTACTOS  ->  COMPLETAR ANTES DEL MODELO
-   Dejar tel en '' oculta el boton de llamada.
+
+   Una entrada aparece en Info solo si tiene telefono (`tel`) o un punto del
+   mapa (`lugar`). Las que no tienen ninguno de los dos no se muestran: una
+   tarjeta que dice "numero a completar" no le sirve a nadie que este en el
+   predio. Asi que las de abajo sin numero estan esperando el suyo.
+
+   urgente: true  destaca la tarjeta y pinta de rojo el boton de llamar.
    --------------------------------------------------------------------------- */
 export const CONTACTOS = [
-  { nombre: 'Emergencias', detalle: 'Ambulancia, bomberos y policía', tel: '911', urgente: true },
   { nombre: 'Centro de Salud de la Repu', detalle: 'En el predio, junto a Bomberos', tel: '', lugar: 'centro-de-salud' },
   { nombre: 'Secretaría General', detalle: 'Organización del modelo', tel: '' },
   { nombre: 'Coordinación de Ujieres', detalle: 'Traslados y logística en el predio', tel: '' },
@@ -203,13 +208,46 @@ export const CONTACTOS = [
 
 /* ---------------------------------------------------------------------------
    INFO PRACTICA  ->  ajustar segun la edicion
+
+   lugar   : id de LUGARES. Agrega un boton "Ver en el mapa".        (opcional)
+   enlaces : [{ texto, url }] que se muestran como links de verdad.  (opcional)
    --------------------------------------------------------------------------- */
 export const INFO = [
-  { titulo: '¿Dónde me acredito?', texto: 'El martes 22 de 17:00 a 18:00, antes del Acto de Apertura. Acercate con tu documento.' },
-  { titulo: '¿Dónde se come?', texto: 'Los refrigerios son simultáneos y se sirven en cada sede. El almuerzo va de 13:00 a 14:00. En el mapa están marcados el restaurante, las confiterías y los kioscos del predio.' },
-  { titulo: 'Código de vestimenta', texto: 'Formal durante las sesiones. Para el Agasajo Diplomático del jueves, formal de gala.' },
-  { titulo: 'Dudas sobre el modelo', texto: 'La organización publica novedades, tópicos y recursos en acserp.org.ar y en Instagram @modeloonulp.' },
-  { titulo: 'Si te perdés', texto: 'Tocá el botón de ubicación en el mapa para saber dónde estás, o acercate a Informes en el Centro Cívico. Los ujieres tienen la lista completa de sedes.' },
+  { titulo: '¿Dónde me acredito?',
+    texto: 'El martes 22 de 17:00 a 18:00, antes del Acto de Apertura. Acercate con tu documento.' },
+  { titulo: '¿Dónde se come?',
+    texto: 'Los refrigerios son simultáneos y se sirven en cada sede. El almuerzo va de 13:00 a 14:00. '
+         + 'En el mapa están marcados el restaurante, las confiterías y los kioscos del predio.',
+    lugar: 'restaurante' },
+  { titulo: 'Código de vestimenta',
+    texto: 'Formal durante las sesiones. Para el Agasajo Diplomático del jueves, formal de gala.' },
+  { titulo: 'Dudas sobre el modelo',
+    texto: 'La organización publica novedades, tópicos y recursos en su sitio y en Instagram.',
+    enlaces: [
+      { texto: 'acserp.org.ar', url: 'https://acserp.org.ar' },
+      { texto: '@modeloonulp', url: 'https://www.instagram.com/modeloonulp/' },
+      { texto: '@prensaacserp', url: 'https://www.instagram.com/prensaacserp/' },
+    ] },
+  { titulo: 'Si te perdés',
+    texto: 'Tocá el botón de ubicación en el mapa para saber dónde estás, o acercate a Informes en el '
+         + 'Centro Cívico. Los ujieres tienen la lista completa de sedes.',
+    lugar: 'informes' },
+];
+
+/* ---------------------------------------------------------------------------
+   HERRAMIENTAS
+   Cosas de la organizacion que viven fuera de esta app y conviene tener a mano.
+   Se muestran en Info, en "Para practicar".
+   --------------------------------------------------------------------------- */
+export const HERRAMIENTAS = [
+  {
+    nombre: 'Improratoria',
+    texto: 'Tres ejercicios de un minuto para entrenar la improvisación: armar un discurso con '
+         + 'palabras que van apareciendo cada diez segundos, tomar postura sobre un tema de la '
+         + 'agenda mundial, o responder una pregunta arrancando por una frase dada.',
+    boton: 'Entrenar antes de sesionar',
+    url: 'https://improratoria.netlify.app/',
+  },
 ];
 
 /* ---------------------------------------------------------------------------

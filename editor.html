@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Editor de puntos — MINULP 2026</title>
 <meta name="robots" content="noindex">
+<link rel="icon" href="img/icons/icon-192.png">
 <link rel="preload" href="fonts/montserrat-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/fuente.css">
 <link rel="stylesheet" href="css/marcas.css">
@@ -56,6 +57,7 @@
       <div class="filtros" id="filtros"></div>
       <div class="conmutador" role="group" aria-label="Modo del editor">
         <button type="button" id="modo-marcar" class="activo">Marcar</button>
+        <button type="button" id="modo-mover">Mover</button>
         <button type="button" id="modo-gps">GPS</button>
       </div>
     </div>
@@ -88,6 +90,22 @@
     <ul class="ed-lista" id="ed-lista"></ul>
   </div>
 
+  <div id="panel-mover" hidden>
+    <p class="ed-nota"><b>1.</b> Elegí el pin: tocalo en el mapa o buscalo en la lista.
+      <b>2.</b> Tocá el mapa donde va. Se mueve ahí mismo para que lo veas.
+      <b>3.</b> Copiá los cambios a <code>js/datos.js</code>.</p>
+    <div class="ed-fila">
+      <select id="mv-punto" aria-label="Punto a mover" style="flex:1 1 200px"></select>
+      <button type="button" class="btn-sec" id="mv-deshacer" style="flex:0 0 auto">Deshacer</button>
+    </div>
+    <code class="salida" id="mv-salida">Todavía no elegiste ningún pin.</code>
+    <div class="ed-fila" style="margin-top:10px">
+      <button type="button" class="btn-sec" id="mv-copiar">Copiar los cambios</button>
+      <button type="button" class="btn-sec" id="mv-descargar">Descargar los cambios</button>
+    </div>
+    <ul class="ed-lista" id="mv-lista"></ul>
+  </div>
+
   <div id="panel-gps" hidden>
     <p class="ed-nota">Caminá por el predio con esto abierto. Muestra dónde te ubica la app y a qué
       distancia real quedan los puntos cargados. Si algo cae corrido, anotá el desvío y ajustá
@@ -101,19 +119,30 @@
 </div>
 
 <script type="module">
-import { LUGARES } from './js/datos.js';
+import { LUGARES, ORGANOS } from './js/datos.js';
 import { crearMapa, TIPOS, GRUPOS } from './js/mapa.js';
 import * as geo from './js/geo.js';
 
 const $ = (s) => document.querySelector(s);
 let ultimo = null;
+let modoActual = 'marcar';
 const agregados = [];
 
 const mapa = crearMapa($('#mapa'), {
   alTocarMapa(fx, fy) {
-    if ($('#panel-gps').hidden === false) return;
-    ultimo = { x: Math.max(0, Math.min(1, fx)), y: Math.max(0, Math.min(1, fy)) };
-    pintarSalida();
+    const x = Math.max(0, Math.min(1, fx));
+    const y = Math.max(0, Math.min(1, fy));
+    if (modoActual === 'marcar') { ultimo = { x, y }; pintarSalida(); }
+    else if (modoActual === 'mover') moverElegido(x, y);
+  },
+  // en modo mover, tocar un pin es la forma natural de elegirlo
+  alSeleccionar(p) {
+    if (modoActual !== 'mover' || !p) return;
+    // pintarMover() vuelve a seleccionar para resaltar el pin: sin este corte
+    // se llamarian el uno al otro para siempre
+    if ($('#mv-punto').value === p.id) return;
+    $('#mv-punto').value = p.id;
+    pintarMover();
   },
 });
 
@@ -190,17 +219,120 @@ $('#ed-descargar').addEventListener('click', () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 });
 
+// ---------------------------------------------------------------- modo MOVER
+//
+// Guarda la posicion original de cada punto para poder deshacer y para mostrar
+// de donde a donde se movio. La app no se toca: lo que sale de aca son las
+// lineas que hay que dejar escritas en datos.js.
+const original = new Map(mapa.puntos.map((p) => [p.id, { x: p.x, y: p.y }]));
+const movidos = new Map();
+
+$('#mv-punto').innerHTML =
+  '<optgroup label="Órganos">' + ORGANOS.map((o) =>
+    `<option value="org-${o.sigla.toLowerCase()}">${o.sigla} — ${o.sede}</option>`).join('') +
+  '</optgroup><optgroup label="Lugares">' + LUGARES.map((l) =>
+    `<option value="${l.id}">${l.nombre} (${TIPOS[l.tipo] ? TIPOS[l.tipo].etiqueta : l.tipo})</option>`).join('') +
+  '</optgroup>';
+
+const puntoElegido = () => mapa.puntos.find((p) => p.id === $('#mv-punto').value) || null;
+
+/** La linea que hay que dejar en datos.js para ese punto. */
+function lineaMovido(p) {
+  const xy = `x: ${p.x.toFixed(4)}, y: ${p.y.toFixed(4)}`;
+  if (p.organo) return `${p.organo.sigla}: en ORGANOS, dejar   ${xy}`;
+  return `${p.id}: en LUGARES, dejar   ${xy}`;
+}
+
+function moverElegido(x, y) {
+  const p = puntoElegido();
+  if (!p) return;
+  mapa.moverPunto(p.id, x, y);
+  movidos.set(p.id, p);
+  pintarMover();
+}
+
+function pintarMover() {
+  const p = puntoElegido();
+  if (!p) return;
+  const o = original.get(p.id);
+  const c = geo.aLatLon(p.x * geo.MAPA_PX, p.y * geo.MAPA_PX);
+  const movido = movidos.has(p.id);
+  const corrimiento = Math.round(Math.hypot((p.x - o.x) * geo.MAPA_PX,
+                                            (p.y - o.y) * geo.MAPA_PX));
+  $('#mv-salida').textContent = [
+    p.organo ? `${p.organo.sigla} — ${p.organo.nombre}` : p.nombre,
+    lineaMovido(p),
+    '',
+    `antes: x ${o.x.toFixed(4)}, y ${o.y.toFixed(4)}   ·   ` +
+      (movido ? `se corrió ${corrimiento} px` : 'sin mover'),
+    `lat ${c.lat.toFixed(6)}, lon ${c.lon.toFixed(6)}   ·   ` +
+      (geo.dentroDelPredio(c.lat, c.lon) ? 'dentro del predio' : 'FUERA del predio'),
+  ].join('\n');
+  $('#mv-lista').innerHTML = [...movidos.values()].map((q) =>
+    `<li><code>${lineaMovido(q)}</code><button type="button" data-id="${q.id}">Deshacer</button></li>`).join('');
+  mapa.seleccionar(p.id, false);
+}
+
+function deshacer(id) {
+  const o = original.get(id);
+  if (!o) return;
+  mapa.moverPunto(id, o.x, o.y);
+  movidos.delete(id);
+  pintarMover();
+}
+
+$('#mv-punto').addEventListener('change', () => {
+  const p = puntoElegido();
+  if (p) mapa.centrarEn(p.id);
+  pintarMover();
+});
+$('#mv-deshacer').addEventListener('click', () => {
+  const p = puntoElegido();
+  if (p) deshacer(p.id);
+});
+$('#mv-lista').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (b) deshacer(b.dataset.id);
+});
+
+const textoCambios = () => [
+  '// Cambios de posición para app/js/datos.js',
+  ...[...movidos.values()].map(lineaMovido),
+  '',
+].join('\n');
+
+$('#mv-copiar').addEventListener('click', async () => {
+  if (!movidos.size) return;
+  try { await navigator.clipboard.writeText(textoCambios()); $('#mv-copiar').textContent = 'Copiado'; }
+  catch (e) { $('#mv-copiar').textContent = 'Copiá a mano'; }
+  setTimeout(() => { $('#mv-copiar').textContent = 'Copiar los cambios'; }, 1600);
+});
+$('#mv-descargar').addEventListener('click', () => {
+  if (!movidos.size) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([textoCambios()], { type: 'text/plain' }));
+  a.download = 'posiciones-nuevas.txt';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+
 // ------------------------------------------------------------------ modo GPS
 let parar = null;
 function modo(cual) {
-  const gps = cual === 'gps';
-  $('#panel-gps').hidden = !gps;
-  $('#panel-marcar').hidden = gps;
-  $('#modo-gps').classList.toggle('activo', gps);
-  $('#modo-marcar').classList.toggle('activo', !gps);
+  modoActual = cual;
+  $('#panel-marcar').hidden = cual !== 'marcar';
+  $('#panel-mover').hidden = cual !== 'mover';
+  $('#panel-gps').hidden = cual !== 'gps';
+  $('#modo-marcar').classList.toggle('activo', cual === 'marcar');
+  $('#modo-mover').classList.toggle('activo', cual === 'mover');
+  $('#modo-gps').classList.toggle('activo', cual === 'gps');
+  $('#mapa').style.cursor = cual === 'gps' ? '' : 'crosshair';
+  if (cual === 'mover') pintarMover(); else mapa.seleccionar(null);
 }
 $('#modo-marcar').addEventListener('click', () => modo('marcar'));
+$('#modo-mover').addEventListener('click', () => modo('mover'));
 $('#modo-gps').addEventListener('click', () => modo('gps'));
+modo('marcar');
 
 $('#gps-prender').addEventListener('click', () => {
   if (parar) {
