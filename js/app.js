@@ -659,8 +659,9 @@ function portada() {
   // el <link rel=preload> del index ya lo dejo en el cache.
   const dibujada = menosMovimiento
     ? mostrar('img/splash-fijo.webp')
-    // credentials omit para que coincida con el <link rel=preload> del index
-    : fetch('img/splash.webp', { credentials: 'omit' })
+    // sin opciones a proposito: asi coincide con el <link rel=preload
+    // crossorigin=anonymous> del index y se reusa esa descarga
+    : fetch('img/splash.webp')
         .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('splash'))))
         .then((b) => { urlBlob = URL.createObjectURL(b); return mostrar(urlBlob); })
         .catch(() => mostrar('img/splash.webp'));

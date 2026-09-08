@@ -123,7 +123,9 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
 
   // ------------------------------------------------------------- marcadores
   const nodos = new Map();
-  for (const p of puntos) {
+
+  /** Dibuja (o vuelve a dibujar) el marcador de un punto. */
+  function pintarMarca(p) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = `marca marca-${p.tipo}`;
@@ -148,9 +150,14 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
       ev.stopPropagation();
       seleccionar(p.id, false);
     });
-    capa.appendChild(b);
+    const viejo = nodos.get(p.id);
+    if (viejo) viejo.replaceWith(b); else capa.appendChild(b);
     nodos.set(p.id, b);
+    if (p.id === seleccion) b.classList.add('marca-activa');
+    return b;
   }
+
+  // el dibujado inicial va mas abajo, cuando ya existe todo el estado
 
   // ----------------------------------------------------------------- estado
   let z = 1, tx = 0, ty = 0, zMin = 0.5, zMax = 4, zPiso = 0.2;
@@ -544,6 +551,8 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
     });
     actualizarRoving();
   }
+
+  for (const p of puntos) pintarMarca(p);
   aplicarFiltros();
 
   // -------------------------------------------------------------- seleccion
@@ -590,6 +599,37 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
     },
     seleccionar,
     asegurarVisible,
+    /**
+     * Alta, baja y modificacion de puntos EN PANTALLA. No tocan datos.js: son
+     * para que editor.html muestre en vivo como va quedando el mapa antes de
+     * escribir el archivo.
+     */
+    agregarPunto(p) {
+      if (puntos.some((q) => q.id === p.id)) return null;
+      puntos.push(p);
+      pintarMarca(p);
+      aplicarFiltros();
+      return p;
+    },
+    quitarPunto(id) {
+      const i = puntos.findIndex((q) => q.id === id);
+      if (i < 0) return false;
+      if (seleccion === id) seleccionar(null);
+      nodos.get(id).remove();
+      nodos.delete(id);
+      puntos.splice(i, 1);
+      actualizarRoving();
+      return true;
+    },
+    actualizarPunto(id, cambios) {
+      const p = puntos.find((q) => q.id === id);
+      if (!p) return null;
+      Object.assign(p, cambios);
+      pintarMarca(p);
+      aplicarFiltros();
+      return p;
+    },
+
     /**
      * Cambia de lugar un punto ya dibujado. Lo usa editor.html para acomodar
      * sedes sin tener que editar datos.js a ciegas y recargar cada vez.

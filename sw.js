@@ -11,7 +11,7 @@
 //  queda listo para la proxima vez (app.js recarga solo si recien abriste).
 // ============================================================================
 
-const VERSION = 'minulp-2026-v11';
+const VERSION = 'minulp-2026-v12';
 
 const ARCHIVOS = [
   './',
@@ -31,6 +31,7 @@ const ARCHIVOS = [
   'js/buscador.js',
   'js/perfil.js',
   'js/qr.js',
+  'js/escribir-datos.js',
   'img/mapa.webp',
   'img/mapa@2x.webp',
   'img/oficial.webp',
