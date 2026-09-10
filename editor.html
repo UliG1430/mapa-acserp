@@ -239,6 +239,48 @@
       opacity: .45;
       cursor: default;
     }
+
+    /* el lugar al que está atado lo que estás editando */
+    .ed-vinculo {
+      margin: 2px 0 10px;
+      font-size: .82rem;
+      line-height: 1.5;
+      color: var(--tinta-2);
+    }
+
+    .ed-vinculo[hidden] {
+      display: none;
+    }
+
+    .ed-vinculo b {
+      color: var(--tinta);
+    }
+
+    .ed-vinculo button {
+      display: inline-block;
+      margin-top: 6px;
+      min-height: 34px;
+      padding: 4px 11px;
+      border-radius: 9px;
+      border: 1px solid var(--borde);
+      background: var(--papel-2);
+      color: var(--tinta);
+      font: inherit;
+      font-size: .82rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* el pin del otro lado del vínculo, resaltado sobre el mapa */
+    .marca-vinculada .marca-disco {
+      outline: 2px dashed var(--acento);
+      outline-offset: 3px;
+    }
+
+    .marca-vinculada .marca-rotulo,
+    .marca-vinculada .marca-sigla {
+      display: block;
+    }
   </style>
 </head>
 
@@ -291,11 +333,16 @@
           </div>
         </div>
 
-        <label class="ed-campo"><span id="ficha-etiqueta">Nombre</span>
+        <label class="ed-campo" id="ficha-campo-sede" hidden><span>Dónde sesiona</span>
+          <select id="ficha-sede"></select></label>
+
+        <label class="ed-campo" id="ficha-campo-nombre"><span id="ficha-etiqueta">Nombre</span>
           <input type="text" id="ficha-nombre" autocomplete="off" placeholder="Cómo se llama"></label>
 
         <label class="ed-campo" id="ficha-campo-tipo"><span>Tipo</span>
           <select id="ficha-tipo"></select></label>
+
+        <p class="ed-vinculo" id="ficha-vinculo" hidden></p>
 
         <div class="ficha-acciones">
           <button type="button" class="btn-pri" id="ficha-mover">Mover</button>
@@ -360,8 +407,21 @@
     const nuevos = new Set();   // ids creados acá
     const quitados = new Map(); // id -> punto que se sacó
 
+    let sedeAMano = false;      // el órgano elegido tiene la sede escrita a mano
+    let vinculados = [];        // órganos que usan como sede el lugar elegido
+
     const foto = (p) => ({ nombre: p.nombre, tipo: p.tipo, x: p.x, y: p.y });
     const cuatro = (v) => Number(Number(v).toFixed(4));
+
+    // A un órgano y su edificio los une el NOMBRE: `sede` en datos.js es texto.
+    // Acá abajo está todo lo que hace falta para que ese vínculo se vea y no se
+    // rompa solo. Mover un pin nunca lo toca: la sede se cambia eligiéndola.
+    const soloLugares = () => mapa.puntos.filter((q) => !q.organo);
+    const lugarLlamado = (nombre) => soloLugares().find((q) => q.nombre === nombre) || null;
+    const organosEn = (nombre) => mapa.puntos.filter((q) => q.organo && q.nombre === nombre);
+
+    /** Distancia (en fracciones del mapa) a partir de la cual conviene reubicar. */
+    const LEJOS = 0.05;
 
     // ------------------------------------------------------------------ mapa ---
     const mapa = crearMapa($('#mapa'), {
@@ -381,7 +441,7 @@
         if (accion === 'mover' && act && p.id !== elegido) {
           // Con un órgano elegido, tocar un edificio ademas fija su sede: es el 90%
           // de lo que hay que hacer cada año.
-          if (act.organo && !p.organo) asignarSede(act, p);
+          if (act.organo && !p.organo) asignarSede(act, p, true);
           else mover(act.id, p.x, Math.min(1, p.y + 0.013));
           return;
         }
@@ -413,6 +473,12 @@
     function elegir(id, centrar = false) {
       elegido = id;
       accion = null;
+      sedeAMano = false;
+      // Nos guardamos qué órganos usan este lugar como sede ANTES de que se
+      // empiece a escribir: si no, al primer tecleo del nombre nuevo el vínculo
+      // ya no se podría encontrar y quedarían apuntando a un lugar inexistente.
+      const p = puntoDe(id);
+      vinculados = p && !p.organo ? organosEn(p.nombre).map((q) => q.id) : [];
       interno = true;
       mapa.seleccionar(id, false);
       interno = false;
@@ -444,14 +510,43 @@
       guardar();
     }
 
-    function asignarSede(organo, edificio) {
-      // un poco más arriba del edificio, para que no se tapen los dos pines
-      mapa.moverPunto(organo.id, edificio.x, Math.max(0, edificio.y - 0.013));
+    /**
+     * Ata un órgano a un lugar. Si el pin ya estaba ahí al lado no lo toca: no
+     * tiene sentido deshacer una posición ajustada a mano sólo por confirmar en
+     * qué edificio sesiona. `forzar` es para cuando el toque en el mapa dijo
+     * explícitamente "va acá".
+     */
+    function asignarSede(organo, edificio, forzar = false) {
+      const lejos = Math.hypot(organo.x - edificio.x, organo.y - edificio.y) > LEJOS;
       mapa.actualizarPunto(organo.id, { nombre: edificio.nombre });
+      // un poco más arriba del edificio, para que no se tapen los dos pines
+      if (forzar || lejos) mapa.moverPunto(organo.id, edificio.x, Math.max(0, edificio.y - 0.013));
       accion = null;
       elegir(organo.id);
       guardar();
-      avisar(`${organo.organo.sigla} ahora sesiona en ${edificio.nombre}.`, 'bien');
+      avisar(`${organo.organo.sigla} sesiona en ${edificio.nombre}` +
+        ((forzar || lejos) ? ', y su pin quedó al lado.' : '. El pin no se movió: ya estaba ahí nomás.'),
+        'bien');
+    }
+
+    /**
+     * El edificio de un órgano puede no estar marcado en el mapa: de las quince
+     * sedes de 2025, doce no figuran en LUGARES. Esto lo agrega de una, justo
+     * debajo del pin del órgano, para que el vínculo exista y se pueda reusar.
+     */
+    function marcarSede() {
+      const p = puntoDe(elegido);
+      if (!p || !p.organo || !p.nombre.trim()) return;
+      const id = 'nuevo-' + (++contador);
+      mapa.agregarPunto({
+        id, nombre: p.nombre.trim(), tipo: 'edificio',
+        x: p.x, y: Math.min(1, p.y + 0.013), organo: null,
+      });
+      nuevos.add(id);
+      elegir(p.id);
+      guardar();
+      avisar(`«${p.nombre.trim()}» quedó marcado en el mapa, justo debajo de ${p.organo.sigla}. ` +
+        'Si el edificio está un poco más allá, elegilo y movelo.', 'bien');
     }
 
     function quitar(id) {
@@ -587,11 +682,20 @@
           : icono(p.tipo);
         $('#ficha-titulo').textContent = esOrgano ? `${p.organo.sigla} · ${p.organo.nombre}` : (p.nombre || 'Punto nuevo');
         $('#ficha-sub').textContent = esOrgano ? 'Órgano del modelo' : TIPOS[p.tipo].etiqueta;
-        $('#ficha-etiqueta').textContent = esOrgano ? 'Dónde sesiona' : 'Nombre';
+        const atado = esOrgano ? lugarLlamado(p.nombre) : null;
+        $('#ficha-etiqueta').textContent = esOrgano ? 'Nombre del lugar' : 'Nombre';
+        // Al órgano se le elige la sede de una lista: así el vínculo con el
+        // edificio queda hecho de verdad y cambiar dos órganos de lugar es
+        // elegir en dos listas. El campo de texto sólo aparece para nombres que
+        // todavía no están marcados en el mapa.
+        $('#ficha-campo-sede').hidden = !esOrgano;
+        if (esOrgano) $('#ficha-sede').innerHTML = opcionesSede(p, atado);
+        $('#ficha-campo-nombre').hidden = esOrgano && !!atado && !sedeAMano;
         if ($('#ficha-nombre') !== document.activeElement) $('#ficha-nombre').value = p.nombre || '';
         $('#ficha-campo-tipo').hidden = esOrgano;
         $('#ficha-tipo').value = esOrgano ? 'sanitarios' : p.tipo;
         $('#ficha-quitar').hidden = esOrgano;
+        pintarVinculo(p, atado);
         const o = original.get(p.id);
         $('#ficha-original').hidden = !o ||
           (o.nombre === p.nombre && o.tipo === p.tipo && cuatro(o.x) === cuatro(p.x) && cuatro(o.y) === cuatro(p.y));
@@ -600,6 +704,19 @@
         $('#ficha-coords').textContent =
           `x ${p.x.toFixed(4)} · y ${p.y.toFixed(4)}   ·   lat ${c.lat.toFixed(6)}, lon ${c.lon.toFixed(6)}   ·   ` +
           (geo.dentroDelPredio(c.lat, c.lon) ? 'dentro del predio' : 'FUERA del predio');
+      }
+
+      // el pin del otro lado del vínculo, marcado sobre el mapa
+      document.querySelectorAll('.marca-vinculada')
+        .forEach((m) => m.classList.remove('marca-vinculada'));
+      if (p) {
+        const otros = p.organo
+          ? [lugarLlamado(p.nombre)].filter(Boolean)
+          : organosEn(p.nombre);
+        for (const q of otros) {
+          const n = document.querySelector(`.marca[data-id="${CSS.escape(q.id)}"]`);
+          if (n) n.classList.add('marca-vinculada');
+        }
       }
 
       // lista de cambios
@@ -613,6 +730,60 @@
       $('#btn-copiar').disabled = !cam.total;
       $('#btn-descartar').disabled = !cam.total;
     }
+
+    /** Lista de lugares para elegir la sede: los edificios primero. */
+    function opcionesSede(p, atado) {
+      const lista = soloLugares().slice().sort((a, b) =>
+        (a.tipo === 'edificio' ? 0 : 1) - (b.tipo === 'edificio' ? 0 : 1) ||
+        a.nombre.localeCompare(b.nombre, 'es'));
+      let html = lista.map((l) => `<option value="${esc(l.id)}"${l.id === (atado && atado.id) ? ' selected' : ''}>` +
+        `${esc(l.nombre)}${l.tipo === 'edificio' ? '' : ' · ' + esc(TIPOS[l.tipo].etiqueta.toLowerCase())}</option>`).join('');
+      if (!atado) {
+        html = `<option value="__suelto__" selected>${esc(p.nombre || 'Sin definir')} — no está en el mapa</option>` + html;
+      }
+      return html + '<option value="__otro__">Otro lugar (escribirlo)…</option>';
+    }
+
+    /** La línea que cuenta con qué está atado lo que estás editando. */
+    function pintarVinculo(p, atado) {
+      const el = $('#ficha-vinculo');
+      if (p.organo) {
+        el.hidden = false;
+        el.innerHTML = atado
+          ? `Atado a <b>${esc(atado.nombre)}</b>, marcado en el mapa. Moverlo no cambia dónde sesiona.`
+          : `<b>${esc(p.nombre || 'Sin definir')}</b> no está marcado en el mapa. ` +
+            'Si lo marcás, después podés mandar cualquier órgano ahí en un toque.' +
+            (p.nombre.trim() ? '<button type="button" id="ficha-marcar-sede">Marcarlo acá</button>' : '');
+        return;
+      }
+      const suyos = organosEn(p.nombre);
+      el.hidden = !suyos.length;
+      if (suyos.length) {
+        el.innerHTML = `Acá sesiona${suyos.length > 1 ? 'n' : ''} ` +
+          suyos.map((q) => `<b>${esc(q.organo.sigla)}</b>`).join(', ') +
+          '. Si le cambiás el nombre, se lo cambia también a ' + (suyos.length > 1 ? 'ellos' : 'él') + '.';
+      }
+    }
+
+    $('#ficha-vinculo').addEventListener('click', (e) => {
+      if (e.target.id === 'ficha-marcar-sede') marcarSede();
+    });
+
+    $('#ficha-sede').addEventListener('change', () => {
+      const p = puntoDe(elegido);
+      if (!p || !p.organo) return;
+      const v = $('#ficha-sede').value;
+      if (v === '__suelto__') return;
+      if (v === '__otro__') {
+        sedeAMano = true;
+        pintar();
+        $('#ficha-nombre').focus();
+        $('#ficha-nombre').select();
+        return;
+      }
+      const l = puntoDe(v);
+      if (l) asignarSede(p, l);
+    });
 
     $('#cambios').addEventListener('click', (e) => {
       const b = e.target.closest('[data-deshacer]');
@@ -628,7 +799,12 @@
 
     $('#ficha-nombre').addEventListener('input', () => {
       if (!elegido) return;
-      mapa.actualizarPunto(elegido, { nombre: $('#ficha-nombre').value });
+      const nombre = $('#ficha-nombre').value;
+      mapa.actualizarPunto(elegido, { nombre });
+      // Si a este lugar lo usan órganos como sede, el nombre les sigue. Sin
+      // esto, renombrar un edificio dejaría a sus órganos apuntando a un lugar
+      // que ya no existe, y sin ningún cartel que lo avisara.
+      for (const id of vinculados) mapa.actualizarPunto(id, { nombre });
       pintar();
     });
     $('#ficha-nombre').addEventListener('change', guardar);

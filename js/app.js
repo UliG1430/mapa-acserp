@@ -385,15 +385,13 @@ function pintarAhora() {
   }
 
   const texto = actual.todos || cron.textoBloque(actual, track) ||
-                cron.columnasBloque(actual).map((c) => c.texto).join(' · ');
+    cron.columnasBloque(actual).map((c) => c.texto).join(' · ');
   const pct = Math.round(cron.progreso(actual, ahora) * 100);
   el.innerHTML = `<p class="ahora-tag">Ahora</p>
     <h2>${esc(texto)}</h2>
-    <p class="ahora-meta">${esc(actual.desde)} a ${esc(actual.hasta)}${
-      track && !actual.todos ? ' · ' + esc(cron.nombreTrack(track)) : ''}</p>
+    <p class="ahora-meta">${esc(actual.desde)} a ${esc(actual.hasta)}${track && !actual.todos ? ' · ' + esc(cron.nombreTrack(track)) : ''}</p>
     <div class="barra"><span style="width:${pct}%"></span></div>
-    <p class="ahora-sig">Termina en <b>${cron.faltan(actual.fin - ahora)}</b>${
-      siguiente ? `. Después: ${esc(siguiente.todos || cron.textoBloque(siguiente, track) || 'sesión')}` : ''}.</p>`;
+    <p class="ahora-sig">Termina en <b>${cron.faltan(actual.fin - ahora)}</b>${siguiente ? `. Después: ${esc(siguiente.todos || cron.textoBloque(siguiente, track) || 'sesión')}` : ''}.</p>`;
 }
 
 setInterval(() => {
@@ -458,8 +456,7 @@ function pintarInfo() {
   if (o) {
     partes.push(`<div class="tarjeta">
       <h2>Sos de ${esc(o.sigla)}</h2>
-      <p>${esc(o.nombre)}. Sesiona en <b>${esc(o.sede)}</b>${
-        cron.nombreTrack(o.track) === o.nombre ? '' : ', dentro de ' + esc(cron.nombreTrack(o.track))}.</p>
+      <p>${esc(o.nombre)}. Sesiona en <b>${esc(o.sede)}</b>${cron.nombreTrack(o.track) === o.nombre ? '' : ', dentro de ' + esc(cron.nombreTrack(o.track))}.</p>
       <div class="ficha-acciones">
         <button type="button" class="btn-pri" id="info-ver-sede">Ver mi sede en el mapa</button>
         <button type="button" class="btn-sec" id="info-cambiar">Cambiar</button>
@@ -479,7 +476,7 @@ function pintarInfo() {
       <h2>${esc(i.titulo)}</h2>
       <p>${esc(i.texto)}</p>
       ${i.enlaces && i.enlaces.length ? `<p class="enlaces">${i.enlaces.map((l) =>
-        `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.texto)}</a>`).join('')}</p>` : ''}
+    `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.texto)}</a>`).join('')}</p>` : ''}
       ${i.lugar ? `<div class="ficha-acciones">
         <button type="button" class="btn-sec" data-lugar="${esc(i.lugar)}">Ver en el mapa</button></div>` : ''}
     </div>`).join(''));
@@ -489,8 +486,7 @@ function pintarInfo() {
   // resuelve nada a quien la esta leyendo en el predio.
   const contactos = CONTACTOS.filter((c) => c.tel || c.lugar);
   if (contactos.length) {
-    partes.push(`<h2 class="lista-grupo">${
-      contactos.some((c) => c.tel) ? 'Teléfonos y ayuda' : 'Dónde pedir ayuda'}</h2>`);
+    partes.push(`<h2 class="lista-grupo">${contactos.some((c) => c.tel) ? 'Teléfonos y ayuda' : 'Dónde pedir ayuda'}</h2>`);
     const puntos = todosLosPuntos();
     partes.push(contactos.map((c) => {
       // el mismo simbolo que tiene en el mapa, para reconocerlo de un vistazo
@@ -517,8 +513,7 @@ function pintarInfo() {
         <h2>${esc(h.nombre)}</h2>
         <p>${esc(h.texto)}</p>
         <div class="ficha-acciones">
-          <a class="btn-pri" href="${esc(h.url)}" target="_blank" rel="noopener noreferrer">${
-            esc(h.boton || 'Abrir')}</a>
+          <a class="btn-pri" href="${esc(h.url)}" target="_blank" rel="noopener noreferrer">${esc(h.boton || 'Abrir')}</a>
         </div>
       </div>`).join(''));
   }
@@ -579,6 +574,12 @@ let elegido = { organo: null };
 
 function abrirPerfil() {
   elegido = { ...obtenerPerfil() };
+  const actual = miOrgano();
+  $('#modal-perfil-ayuda').innerHTML = actual
+    ? `Ahora estás viendo lo de <b>${esc(actual.sigla)}</b>. Tocá otro órgano para cambiarlo,
+       o <b>Ver todo</b> para ver el modelo completo.`
+    : `Sirve para mostrarte tu sede en el mapa y filtrar el cronograma.
+       Se puede modificar cuando quieras.`;
   $('#grilla-organos').innerHTML = ORGANOS.map((o) => `
     <button type="button" class="op-organo" data-sigla="${esc(o.sigla)}"
       aria-pressed="${elegido.organo === o.sigla}">
@@ -595,15 +596,20 @@ $('#grilla-organos').addEventListener('click', (e) => {
   $$('#grilla-organos .op-organo').forEach((x) =>
     x.setAttribute('aria-pressed', String(x.dataset.sigla === elegido.organo)));
 });
-$('#modal-perfil').addEventListener('close', () => {
-  if ($('#modal-perfil').returnValue === 'guardar') {
-    guardarPerfil({ organo: elegido.organo, listo: true });
-    if (elegido.organo && mapa) {
-      verEnElMapa('org-' + elegido.organo.toLowerCase(), 120);
-    }
-  } else {
-    guardarPerfil({ listo: true });
-  }
+/**
+ * Se escucha el `submit` del formulario y NO el `close` del <dialog>: hay
+ * navegadores donde ese `close` no llega nunca, y ahi la eleccion se perdia sin
+ * avisar. El submit siempre llega, y ademas dice cual de los dos botones fue.
+ * Cerrar con Escape no dispara submit, y entonces no cambia nada: es lo
+ * correcto, porque escaparse no es elegir.
+ */
+$('#form-perfil').addEventListener('submit', (e) => {
+  const salida = e.submitter ? e.submitter.value : 'guardar';
+  // "Ver todo" es elegir no tener organo. Si habia uno, se limpia: si no, el
+  // boton no hacia nada para quien ya habia elegido, que es lo que confundia.
+  const organo = salida === 'omitir' ? null : elegido.organo;
+  guardarPerfil({ organo });
+  if (organo && mapa) verEnElMapa('org-' + organo.toLowerCase(), 120);
 });
 
 $('#btn-perfil').addEventListener('click', abrirPerfil);
@@ -662,9 +668,9 @@ function portada() {
     // sin opciones a proposito: asi coincide con el <link rel=preload
     // crossorigin=anonymous> del index y se reusa esa descarga
     : fetch('img/splash.webp')
-        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('splash'))))
-        .then((b) => { urlBlob = URL.createObjectURL(b); return mostrar(urlBlob); })
-        .catch(() => mostrar('img/splash.webp'));
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('splash'))))
+      .then((b) => { urlBlob = URL.createObjectURL(b); return mostrar(urlBlob); })
+      .catch(() => mostrar('img/splash.webp'));
 
   const mapaListo = new Promise((res) => {
     const fondo = $('#mapa-fondo');
@@ -680,7 +686,7 @@ function portada() {
       // paso esperamos al mapa para no mostrar un recuadro vacio. Con tope: la
       // app se abre muchas veces por dia, no puede tardar mas que eso.
       return Promise.all([espera(DURACION_PORTADA),
-                          Promise.race([mapaListo, espera(1500)])]);
+      Promise.race([mapaListo, espera(1500)])]);
     })
     .then(() => {
       el.classList.add('saliendo');
@@ -690,7 +696,7 @@ function portada() {
   // El tope no es decorativo: si algo de esto se cuelga, la app tiene que
   // aparecer igual. Una portada trabada equivale a una app rota.
   return Promise.race([secuencia, espera(TOPE_PORTADA)])
-    .catch(() => {})
+    .catch(() => { })
     .then(() => {
       el.hidden = true;
       if (urlBlob) URL.revokeObjectURL(urlBlob);
@@ -709,9 +715,12 @@ verComo('mapa');
 const vistaInicial = (location.hash || '').replace('#', '');
 irA(['mapa', 'cronograma', 'buscar', 'info'].includes(vistaInicial) ? vistaInicial : 'mapa', false);
 
-// el modal no debe taparle la portada a nadie: espera a que termine
+// Sin organo elegido, la app pregunta en cada visita: elegirlo es lo que hace
+// que el cronograma y el mapa muestren lo tuyo. Una vez elegido queda guardado
+// y no vuelve a molestar. El modal espera a que la portada termine: no puede
+// taparle a nadie la animacion de entrada.
 portadaTerminada.then(() => {
-  if (!obtenerPerfil().listo) setTimeout(abrirPerfil, 260);
+  if (!obtenerPerfil().organo) setTimeout(abrirPerfil, 260);
 });
 
 // ---------------------------------------------------------- service worker
@@ -727,7 +736,7 @@ if ('serviceWorker' in navigator && ES_DESARROLLO) {
   navigator.serviceWorker.getRegistrations()
     .then((rs) => Promise.all(rs.map((r) => r.unregister())))
     .then(() => (self.caches ? caches.keys().then((ks) => Promise.all(ks.map((k) => caches.delete(k)))) : null))
-    .catch(() => {});
+    .catch(() => { });
 } else if ('serviceWorker' in navigator) {
   // Si ya habia una version corriendo y entra a mandar una nueva, recargamos
   // una sola vez para quedar con todo de la misma version. Solo si la pagina
@@ -740,6 +749,6 @@ if ('serviceWorker' in navigator && ES_DESARROLLO) {
     location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').catch(() => { });
   });
 }

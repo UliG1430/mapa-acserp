@@ -296,7 +296,8 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
   // hace falta seguirlo aunque se salga del mapa.
   const activos = new Map();
   const capturados = new Set();
-  let arrastre = null, pellizco = null, movio = false, ultimoTap = 0;
+  let arrastre = null, pellizco = null, movio = false;
+  let ultimoTap = { t: 0, x: 0, y: 0 };
 
   function capturar(id) {
     if (capturados.has(id)) return;
@@ -368,12 +369,16 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
       const sobreAlgo = e.target instanceof Element && e.target.closest('.marca, .yo-borde');
       if (!movio && !sobreAlgo) {
         const ahora = Date.now();
-        if (ahora - ultimoTap < 320) {
+        // Un doble toque son dos toques seguidos EN EL MISMO LUGAR. Sin mirar la
+        // distancia, dos toques rapidos en puntos distintos del mapa se tomaban
+        // como doble toque y acercaban en vez de hacer lo que se pedia.
+        const cerca = Math.hypot(e.clientX - ultimoTap.x, e.clientY - ultimoTap.y) < 40;
+        if (ahora - ultimoTap.t < 320 && cerca) {
           const r = raiz.getBoundingClientRect();
           zoomA(z * 1.9, e.clientX - r.left, e.clientY - r.top);
-          ultimoTap = 0;
+          ultimoTap = { t: 0, x: 0, y: 0 };
         } else {
-          ultimoTap = ahora;
+          ultimoTap = { t: ahora, x: e.clientX, y: e.clientY };
           seleccionar(null);
           if (alTocarMapa) {
             const r = raiz.getBoundingClientRect();

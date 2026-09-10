@@ -11,7 +11,7 @@
 //  queda listo para la proxima vez (app.js recarga solo si recien abriste).
 // ============================================================================
 
-const VERSION = 'minulp-2026-v12';
+const VERSION = 'minulp-2026-v14';
 
 const ARCHIVOS = [
   './',
