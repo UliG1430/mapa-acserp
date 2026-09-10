@@ -797,3 +797,30 @@ a.btn-pri, a.btn-sec { text-decoration: none; display: grid; place-items: center
     max-width: min(42ch, calc(100% - 430px));
   }
 }
+
+/* Superficies de consulta: mapa primero, controles legibles, estado persistente. */
+.estado-publicacion{flex:0 0 auto;padding:5px 16px;background:var(--papel-2);border-bottom:1px solid var(--borde);font-size:.78rem;color:var(--tinta-2);}
+.estado-publicacion[data-estado="offline"],.estado-publicacion[data-estado="sin-actualizar"]{color:var(--alerta)}
+.estado-publicacion[data-estado="preview"]{background:#3b1d5e;color:#fff;font-weight:600}
+.mapa-busqueda{padding:10px 12px 4px;background:var(--papel);display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.buscar-mapa{flex:1;min-width:220px;min-height:46px;padding:10px 14px;border:1px solid var(--borde);border-radius:12px;background:var(--papel-2);text-align:left;font-size:.9rem;color:var(--tinta-2);cursor:pointer;display:flex;justify-content:space-between;}
+.accesos-rapidos{display:flex;gap:6px;overflow:auto;}
+.accesos-rapidos button{border:1px solid var(--borde);background:var(--papel);border-radius:10px;min-height:44px;padding:8px 12px;font-size:.875rem;font-weight:600;white-space:nowrap;cursor:pointer;}
+.accesos-rapidos button:first-child{background:var(--navy);color:white;border-color:var(--navy)}
+.filtro,.conmutador button{min-height:44px;font-size:.875rem}
+.tabbar button{font-size:.875rem}
+.fila-sub,.modal-ayuda{font-size:.875rem}
+.grilla-organos{grid-template-columns:repeat(2,minmax(0,1fr))}
+.op-organo{font-size:.875rem;text-align:center;min-height:115px;padding:12px 8px;}
+.op-organo span{font-weight:400;font-size:.8rem;line-height:1.35}
+.marca{min-width:44px;min-height:44px;justify-content:center;}
+.marca-edificio{min-width:36px;min-height:36px;}
+.marca-activa:not([hidden]),.marca-filtrada:not([hidden]){display:flex!important}
+.marca-sigla,.marca-rotulo{font-size:12px}
+.ficha-plegar{border:0;background:none;color:var(--acento);font-size:.875rem;min-height:40px;cursor:pointer;padding:0 4px;margin-bottom:6px;}
+.ficha.plegada .ficha-datos,.ficha.plegada .ficha-acciones{display:none}
+.ctrl#btn-gps-apagar{font-size:11px}
+@media(max-width:600px){.mapa-busqueda{gap:6px}.buscar-mapa{flex-basis:100%}.accesos-rapidos{width:100%}.accesos-rapidos button{flex:1;padding:8px}.cabecera-sub{display:none}.estado-publicacion{font-size:.75rem}.ficha{max-height:55%}}
+@media(min-width:1000px){#vista-mapa:has(#lista-lugares:not([hidden])) #mapa-caja{display:block!important;flex:1}#vista-mapa:has(#lista-lugares:not([hidden])){padding-left:340px}#vista-mapa:has(#lista-lugares:not([hidden])) .lista-lugares{position:absolute;left:0;top:0;bottom:0;width:340px;border-right:1px solid var(--borde)}.ficha-plegar{display:none}}
+@media print{.estado-publicacion{display:none}}
+.organo-iniciales{width:100%;height:100%;display:grid;place-items:center;background:var(--navy);color:#fff;border-radius:50%;font-size:.65rem;font-weight:700;overflow:hidden;text-overflow:ellipsis}.op-organo>.organo-iniciales{width:34px;height:34px}.chip-perfil>.organo-iniciales{width:24px;height:24px}.organo-iniciales.ficha-logo{width:48px;height:48px;flex-shrink:0}.ed-place-icon .organo-iniciales{width:30px;height:30px}

@@ -3,7 +3,7 @@
 //  Todas las horas se interpretan en la hora local del dispositivo.
 // ============================================================================
 
-import { CRONOGRAMA } from './datos.js';
+import { CRONOGRAMA, alCambiarDatos } from './datos.js';
 
 const NOMBRE_TRACK = {
   sti: 'Sala de Tratados Internacionales',
@@ -14,14 +14,21 @@ const NOMBRE_TRACK = {
 export const TRACKS = ['sti', 'asamblearios', 'cs'];
 export const nombreTrack = (t) => NOMBRE_TRACK[t] || '';
 
-function aFecha(iso, hhmm) {
-  const [a, m, d] = iso.split('-').map(Number);
-  const [h, min] = hhmm.split(':').map(Number);
-  return new Date(a, m - 1, d, h, min, 0, 0);
+export const ZONA = 'America/Argentina/Buenos_Aires';
+export function fechaLocal(fecha = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:ZONA,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(fecha).map(p=>[p.type,p.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+export function aFecha(iso, hhmm) {
+  // Convertir hora de pared a instante con la zona IANA, sin depender del dispositivo.
+  const wall=Date.parse(`${iso}T${hhmm}:00Z`);
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:ZONA,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(new Date(wall)).map(p=>[p.type,p.value]));
+  const asUTC=Date.parse(`${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}Z`);
+  return new Date(wall+(wall-asUTC));
 }
 
 /** Devuelve la lista de bloques de todo el modelo, ya con Date de inicio y fin. */
-export function todosLosBloques() {
+function construirBloques() {
   const out = [];
   CRONOGRAMA.forEach((jornada, ij) => {
     jornada.bloques.forEach((b, ib) => {
@@ -38,7 +45,9 @@ export function todosLosBloques() {
   return out.sort((x, y) => x.inicio - y.inicio);
 }
 
-const BLOQUES = todosLosBloques();
+let BLOQUES = construirBloques();
+alCambiarDatos(()=>{BLOQUES=construirBloques();});
+export function todosLosBloques(){return BLOQUES;}
 
 export const primerBloque = () => BLOQUES[0];
 export const ultimoBloque = () => BLOQUES[BLOQUES.length - 1];
@@ -75,21 +84,14 @@ export function columnasBloque(bloque) {
 
 /** La jornada que corresponde mostrar por defecto. */
 export function jornadaPorDefecto(ahora = new Date()) {
-  const hoy = CRONOGRAMA.findIndex((j) => {
-    const ini = aFecha(j.fecha, '00:00');
-    const fin = aFecha(j.fecha, '23:59');
-    return ahora >= ini && ahora <= fin;
-  });
+  const hoy = CRONOGRAMA.findIndex(j => j.fecha === fechaLocal(ahora));
   if (hoy >= 0) return hoy;
   const { estado, siguiente } = estadoEn(ahora);
   if (estado === 'despues') return CRONOGRAMA.length - 1;
   return siguiente ? siguiente.indiceJornada : 0;
 }
 
-export function hhmm(fecha) {
-  return String(fecha.getHours()).padStart(2, '0') + ':' +
-         String(fecha.getMinutes()).padStart(2, '0');
-}
+export function hhmm(fecha) {return new Intl.DateTimeFormat('es-AR',{timeZone:ZONA,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(fecha);}
 
 /** "2 h 15 min", "18 min", "menos de 1 min" */
 export function faltan(ms) {

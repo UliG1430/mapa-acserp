@@ -14,45 +14,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="MINULP 2026">
   <link rel="preload" href="fonts/montserrat-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <!-- as="fetch" y no as="image" a proposito: app.js lo pide con fetch(), y asi
-     el navegador reusa esta misma descarga en vez de bajarlo dos veces -->
-  <link rel="preload" href="img/splash.webp" as="fetch" crossorigin="anonymous">
   <link rel="stylesheet" href="css/fuente.css">
   <link rel="stylesheet" href="css/marcas.css">
   <link rel="stylesheet" href="css/app.css">
-  <!-- La portada se pinta antes que nada para que no haya un destello blanco.
-     Va en linea a proposito: si esperara al css externo, ya seria tarde. -->
-  <style>
-    #portada {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      background: #0e153e;
-      display: grid;
-      place-items: center;
-    }
-
-    #portada[hidden] {
-      display: none;
-    }
-  </style>
 </head>
 
 <body>
-
-  <div id="portada" role="status" aria-label="Cargando MINULP 2026">
-    <div class="portada-caja">
-      <!-- el src lo pone app.js: ver el comentario de portada() -->
-      <img id="portada-anim" alt="" width="224" height="224" decoding="async">
-      <p class="portada-txt">MINULP 2026</p>
-    </div>
-  </div>
-  <!-- Red de seguridad: pase lo que pase con el javascript, la portada se va.
-     Quedarse mirando una pantalla azul para siempre no es una opcion. -->
-  <script>setTimeout(function () {
-      var p = document.getElementById('portada');
-      if (p) p.hidden = true;
-    }, 8000);</script>
 
   <a class="saltar" href="#contenido">Saltar al contenido</a>
 
@@ -69,10 +36,20 @@
     </button>
   </header>
 
-  <main id="contenido">
+  <main id="contenido" tabindex="-1">
+
 
     <!-- ================================================================ MAPA -->
     <section class="vista" id="vista-mapa" aria-label="Mapa del predio">
+      <div class="mapa-busqueda">
+        <button type="button" id="buscar-en-mapa" class="buscar-mapa">Buscar órgano, baño o lugar… <span aria-hidden="true">⌕</span></button>
+        <div class="accesos-rapidos" aria-label="Destinos frecuentes">
+          <button type="button" id="mi-sede">Mi sede</button>
+          <button type="button" data-busqueda="baño">Baños</button>
+          <button type="button" data-busqueda="comer">Comida</button>
+          <button type="button" data-busqueda="salud">Ayuda</button>
+        </div>
+      </div>
       <div class="barra-filtros" role="group" aria-label="Qué mostrar en el mapa">
         <div class="filtros" id="filtros"></div>
         <div class="conmutador" role="group" aria-label="Forma de ver los lugares">
@@ -82,7 +59,7 @@
             </svg>
           </button>
           <button type="button" id="btn-ver-lista" aria-pressed="false"
-            aria-label="Ver como lista, ordenada por cercanía">
+            aria-label="Ver lista de lugares">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 5h3v3H4V5Zm5 .5h11v2H9v-2ZM4 10.5h3v3H4v-3Zm5 .5h11v2H9v-2ZM4 16h3v3H4v-3Zm5 .5h11v2H9v-2Z" />
             </svg>
@@ -96,6 +73,7 @@
         </div>
 
         <div class="mapa-controles">
+          <button type="button" id="btn-gps-apagar" class="ctrl" hidden aria-label="Desactivar ubicación">GPS ×</button>
           <button type="button" id="btn-ubicar" class="ctrl ctrl-ubicar" aria-label="Mostrar dónde estoy">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -119,7 +97,7 @@
 
         <p class="credito">Calles © <span>OpenStreetMap</span> · Ilustración del predio: República de los Niños</p>
         <p class="aviso-gps" id="aviso-gps" hidden></p>
-        <div class="ficha" id="ficha" hidden aria-live="polite"></div>
+        <div class="ficha" id="ficha" hidden></div>
       </div>
 
       <div class="lista-lugares" id="lista-lugares" hidden></div>
@@ -129,7 +107,7 @@
     <section class="vista" id="vista-cronograma" hidden aria-label="Cronograma">
       <div class="ahora" id="ahora" aria-live="polite"></div>
       <div class="tabs-jornada" id="tabs-jornada" role="tablist" aria-label="Jornadas"></div>
-      <div class="bloques" id="bloques" role="tabpanel"></div>
+      <div class="bloques" id="bloques" role="tabpanel" tabindex="0"></div>
     </section>
 
     <!-- ============================================================== BUSCAR -->

@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1788988350960,
+      "tag": "0000_gigantic_marten_broadcloak",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788999064402,
+      "tag": "0001_hesitant_captain_britain",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788999434084,
+      "tag": "0002_outgoing_steve_rogers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788999851595,
+      "tag": "0003_parallel_stardust",
+      "breakpoints": true
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 //  Ignora tildes y mayusculas: "orga" encuentra "Órganos", "banos" "Sanitarios".
 // ============================================================================
 
-import { ORGANOS } from './datos.js';
+import { ORGANOS, alCambiarDatos } from './datos.js';
 import { todosLosPuntos, TIPOS } from './mapa.js';
 
 const SINONIMOS = {
@@ -29,6 +29,7 @@ export function normalizar(s) {
 }
 
 let indice = null;
+alCambiarDatos(()=>{indice=null;});
 
 function construir() {
   const puntos = todosLosPuntos();

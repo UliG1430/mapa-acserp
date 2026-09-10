@@ -1,3 +1,5 @@
+import {logoOrgano,colorOrgano} from './organos.js';
+import {esc} from './seguridad.js';
 // ============================================================================
 //  mapa.js — mapa ilustrado con desplazamiento, zoom, marcadores y ubicacion.
 //  Sin librerias: los marcadores son <button> reales para que funcionen con
@@ -72,7 +74,8 @@ export function icono(tipo) {
 }
 
 /** Todos los puntos del mapa: organos primero, despues lugares. */
-export function todosLosPuntos() {
+export function todosLosPuntos() { return puntosDeDatos({ORGANOS,LUGARES}); }
+export function puntosDeDatos({ORGANOS,LUGARES}) {
   const sedes = ORGANOS.map((o) => ({
     id: 'org-' + o.sigla.toLowerCase(),
     nombre: o.sede,
@@ -83,8 +86,8 @@ export function todosLosPuntos() {
   return [...sedes, ...LUGARES.map((l) => ({ ...l, organo: null }))];
 }
 
-export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = {}) {
-  const puntos = todosLosPuntos();
+export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera, datos } = {}) {
+  const puntos = datos ? puntosDeDatos(datos) : todosLosPuntos();
 
   raiz.innerHTML = `
     <div class="mapa-lienzo" id="mapa-lienzo">
@@ -134,16 +137,15 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
     b.style.left = (p.x * 100) + '%';
     b.style.top = (p.y * 100) + '%';
     if (p.organo) {
-      b.style.setProperty('--marca-color', `var(--c-${p.organo.sigla.toLowerCase()})`);
+      b.style.setProperty('--marca-color', colorOrgano(p.organo.sigla));
       b.innerHTML =
-        `<span class="marca-disco"><img src="img/logos/${p.organo.sigla}.webp" alt=""
-             width="192" height="192" loading="lazy"></span>` +
+        `<span class="marca-disco">${logoOrgano(p.organo.sigla)}</span>` +
         `<span class="marca-sigla">${p.organo.sigla}</span>`;
       b.setAttribute('aria-label', `${p.organo.sigla} — ${p.organo.nombre}. Sede: ${p.sede || p.nombre}`);
     } else {
       b.style.setProperty('--marca-color', TIPOS[p.tipo].color);
       b.innerHTML = `<span class="marca-disco">${icono(p.tipo)}</span>` +
-                    `<span class="marca-rotulo">${p.nombre}</span>`;
+                    `<span class="marca-rotulo">${esc(p.nombre)}</span>`;
       b.setAttribute('aria-label', `${p.nombre}${p.det ? '. ' + p.det : ''}`);
     }
     b.addEventListener('click', (ev) => {
@@ -166,6 +168,8 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
   let ubic = null;
   let escalaPantalla = 1;
   let tocado = false;   // ya intervino la persona? entonces no reencuadramos solos
+  let frame = null;
+  let altaResolucion = false;
   let pendiente = null; // encuadre pedido mientras el mapa estaba oculto
 
   /**
@@ -189,6 +193,11 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
   }
 
   function aplicar() {
+    if(frame!==null)return;
+    frame=requestAnimationFrame(()=>{frame=null;pintarTransformacion();});
+  }
+  function pintarTransformacion() {
+    if(!altaResolucion && z/zMin>2 && !navigator.connection?.saveData && raiz.dataset.fondo!=='oficial'){ fondo.src='img/mapa@2x.webp';altaResolucion=true; }
     lienzo.style.transform = `translate(${tx}px, ${ty}px) scale(${z})`;
     // Los marcadores viven dentro del lienzo, que ya esta escalado por z. Para que
     // midan siempre lo mismo en pantalla hay que dividir por z. Ademas los achicamos
@@ -366,7 +375,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
       // un marcador lo resuelve el propio boton; aca solo nos ocupamos de los
       // toques en el mapa vacio.
       const sobreAlgo = e.target instanceof Element && e.target.closest('.marca, .yo-borde');
-      if (!movio && !sobreAlgo) {
+      if (e.type !== 'pointercancel' && !movio && !sobreAlgo) {
         const ahora = Date.now();
         if (ahora - ultimoTap < 320) {
           const r = raiz.getBoundingClientRect();
@@ -547,7 +556,8 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
     const permitidos = new Set();
     GRUPOS.forEach((g) => { if (filtros.has(g.id)) g.tipos.forEach((t) => permitidos.add(t)); });
     nodos.forEach((nodo) => {
-      nodo.hidden = !permitidos.has(nodo.dataset.tipo);
+      nodo.hidden = !permitidos.has(nodo.dataset.tipo) && nodo.dataset.id !== seleccion;
+      nodo.classList.toggle('marca-filtrada', filtros.size < GRUPOS.length && permitidos.has(nodo.dataset.tipo));
     });
     actualizarRoving();
   }
@@ -566,7 +576,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
       capa.appendChild(nodo);                    // al frente
       if (centrarTambien) centrar(p.x, p.y, Math.max(z, zMin * 2.6));
     }
-    actualizarRoving();
+    aplicarFiltros();
     if (alSeleccionar) alSeleccionar(p, ubic);
   }
 
@@ -586,6 +596,15 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
 
   const api = {
     puntos,
+    setDatos(datos) {
+      const nuevos=puntosDeDatos(datos);const ids=new Set(nuevos.map(p=>p.id));
+      for(const [id,nodo] of nodos)if(!ids.has(id)){nodo.remove();nodos.delete(id);}
+      puntos.splice(0,puntos.length,...nuevos);
+      for(const p of puntos)pintarMarca(p);
+      if(seleccion&&!ids.has(seleccion))seleccion=null;
+      aplicarFiltros();
+      if(alSeleccionar)alSeleccionar(puntos.find(p=>p.id===seleccion)||null,ubic);
+    },
     encuadrar: () => { tocado = true; encuadrar(); },
     vistaInicial,
     acercar: () => { tocado = true; zoomA(z * 1.5); },
@@ -647,7 +666,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera } = 
     seleccionActual: () => seleccion,
     setFiltros(nuevos) { filtros = new Set(nuevos); aplicarFiltros(); },
     setFondo(cual) {
-      fondo.src = cual === 'oficial' ? 'img/oficial.webp' : 'img/mapa.webp';
+      fondo.src = cual === 'oficial' ? 'img/oficial.webp' : (altaResolucion ? 'img/mapa@2x.webp' : 'img/mapa.webp');
       raiz.dataset.fondo = cual;
     },
     setUbicacion(u) {

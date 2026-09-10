@@ -1,3 +1,6 @@
+import {logoOrgano,colorOrgano} from './organos.js';
+import {alCambiarDatos, obtenerDatos, publicacion} from './datos.js';
+import {prepararOffline} from './estado-publico.js';
 // ============================================================================
 //  app.js — arma la interfaz y conecta mapa, cronograma, buscador y perfil.
 // ============================================================================
@@ -20,6 +23,9 @@ let pararGps = null;
 let estadoGps = 'apagado';        // apagado | buscando | activo | error
 let jornadaVisible = cron.jornadaPorDefecto();
 let jornadaElegidaAMano = false;
+let organoConsulta = null;
+const organoVisible=()=>ORGANOS.find(o=>o.sigla===organoConsulta)||miOrgano();
+const trackVisible=()=>organoVisible()?.track||null;
 
 // ===========================================================================
 //  VISTAS
@@ -34,9 +40,11 @@ function irA(vista, foco = true) {
   if (vista === 'cronograma') pintarCronograma();
   if (vista === 'info') pintarInfo();
   if (vista === 'buscar' && foco) setTimeout(() => $('#q').focus(), 60);
-  location.hash = vista;
+  if(location.hash!=='#'+vista)location.hash = vista;
+  if(foco && vista!=='buscar'){$('#vista-'+vista).tabIndex=-1;$('#vista-'+vista).focus({preventScroll:true});}
 }
 
+window.addEventListener('hashchange',()=>{const v=location.hash.slice(1);irA(['mapa','cronograma','buscar','info'].includes(v)?v:'mapa',false);});
 $$('.tabbar button').forEach((b) => b.addEventListener('click', () => irA(b.dataset.vista)));
 
 // el logo del encabezado es el camino de vuelta al mapa desde cualquier lado
@@ -114,15 +122,10 @@ function verComo(cual) {
 
 // ---------------------------------------------------------------- ubicacion
 function alternarGps() {
-  if (pararGps) {
-    pararGps(); pararGps = null; estadoGps = 'apagado';
-    mapa.setUbicacion(null);
-    $('#btn-ubicar').dataset.estado = '';
-    avisar(null);
-    return;
-  }
+  if (pararGps) { mapa.irAMiUbicacion(); return; }
   let apagado = false;
   estadoGps = 'buscando';
+  $('#btn-gps-apagar').hidden=false;
   $('#btn-ubicar').dataset.estado = 'buscando';
   avisar('Buscando tu ubicación…');
   const parar = geo.seguirUbicacion(
@@ -156,6 +159,7 @@ function alternarGps() {
       // asi que lo apagamos: si no, cada toque al boton dejaba otro GPS prendido.
       if (err === 'demora') return;
       estadoGps = 'error';
+      $('#btn-gps-apagar').hidden=true;
       $('#btn-ubicar').dataset.estado = '';
       if (pararGps) pararGps();
       pararGps = null;
@@ -165,6 +169,8 @@ function alternarGps() {
   // si el error salto de entrada (sincronico), no dejamos el seguimiento colgado
   if (apagado) parar(); else pararGps = parar;
 }
+
+$('#btn-gps-apagar').addEventListener('click',()=>{pararGps?.();pararGps=null;estadoGps='apagado';mapa.setUbicacion(null);$('#btn-ubicar').dataset.estado='';$('#btn-gps-apagar').hidden=true;avisar(null);});
 
 function avisar(txt) {
   const el = $('#aviso-gps');
@@ -206,7 +212,7 @@ function pintarFicha(p, u) {
   const d = distanciaA(p, u);
 
   const cabecera = o
-    ? `<img class="ficha-logo" src="img/logos/${o.sigla}.webp" alt="" width="192" height="192">
+    ? `${logoOrgano(o.sigla,'ficha-logo')}
        <div><h2>${esc(o.sigla)} · ${esc(o.nombre)}</h2>
        <p class="ficha-sub">Sesiona en ${esc(p.nombre)}${o.nota ? ' · ' + esc(o.nota) : ''}</p></div>`
     : `<span class="ficha-icono" style="background:${TIPOS[p.tipo].color}">${icono(p.tipo)}</span>
@@ -215,19 +221,22 @@ function pintarFicha(p, u) {
 
   const datos = [];
   if (d) {
-    datos.push(`<div class="dato"><dt>Distancia</dt><dd>
+    datos.push(`<div class="dato"><dt>Distancia directa</dt><dd>
       <svg class="rumbo-flecha" viewBox="0 0 24 24" aria-hidden="true"
            style="transform:rotate(${d.anguloMapa.toFixed(0)}deg)"><path d="M12 2 21 21l-9-5-9 5Z"/></svg>
       ${geo.formatearDistancia(d.metros)}</dd></div>`);
-    datos.push(`<div class="dato"><dt>Caminando</dt><dd>${geo.minutosCaminando(d.metros)} min · al ${geo.nombreRumbo(d.rumbo)}</dd></div>`);
+    datos.push(`<div class="dato"><dt>Tiempo estimado</dt><dd>${geo.minutosCaminando(d.metros)} min aprox. · al ${geo.nombreRumbo(d.rumbo)}</dd></div>`);
   }
   if (o) {
     const est = cron.estadoEn();
     const ahora = est.actual ? cron.textoBloque(est.actual, o.track) : null;
+    const proxima=est.siguiente ? cron.textoBloque(est.siguiente,o.track) : null;
+    if(!ahora&&proxima)datos.push(`<div class="dato"><dt>Próxima actividad</dt><dd>${esc(proxima)} · ${esc(est.siguiente.desde)}</dd></div>`);
     datos.push(`<div class="dato"><dt>Ahora acá</dt><dd>${esc(ahora || 'Sin actividad')}</dd></div>`);
   }
 
   f.innerHTML = `
+    <button type="button" class="ficha-plegar" aria-expanded="true">Reducir ficha</button>
     <button type="button" class="ficha-cerrar" aria-label="Cerrar">&times;</button>
     <div class="ficha-cab">${cabecera}</div>
     ${datos.length ? `<dl class="ficha-datos">${datos.join('')}</dl>` : ''}
@@ -236,6 +245,8 @@ function pintarFicha(p, u) {
       ${!d ? '<button type="button" class="btn-sec" data-ir="ubicar">¿A qué distancia estoy?</button>' : ''}
     </div>`;
   f.hidden = false;
+  f.classList.remove('plegada');
+  f.querySelector('.ficha-plegar').onclick=e=>{const on=f.classList.toggle('plegada');e.target.setAttribute('aria-expanded',String(!on));e.target.textContent=on?'Ampliar ficha':'Reducir ficha';};
   // la ficha tapa parte del mapa: corremos la vista si el punto quedo abajo
   requestAnimationFrame(() => {
     const fr = f.getBoundingClientRect();
@@ -247,7 +258,7 @@ function pintarFicha(p, u) {
   });
   f.querySelector('.ficha-cerrar').addEventListener('click', () => mapa.seleccionar(null));
   const ir = f.querySelector('[data-ir="cronograma"]');
-  if (ir) ir.addEventListener('click', () => { if (o) guardarPerfil({ organo: o.sigla }); irA('cronograma'); });
+  if (ir) ir.addEventListener('click', () => { if (o) organoConsulta=o.sigla; irA('cronograma'); });
   const ub = f.querySelector('[data-ir="ubicar"]');
   if (ub) ub.addEventListener('click', alternarGps);
 }
@@ -277,10 +288,10 @@ function pintarLista() {
   cont.innerHTML = encabezado + items.map(({ p, d }) => {
     const o = p.organo;
     const ico = o
-      ? `<img src="img/logos/${o.sigla}.webp" alt="" width="192" height="192">`
+      ? logoOrgano(o.sigla)
       : icono(p.tipo);
     return `<button type="button" class="fila" data-id="${esc(p.id)}">
-      <span class="fila-icono" style="background:${o ? `var(--c-${o.sigla.toLowerCase()})` : TIPOS[p.tipo].color}">${ico}</span>
+      <span class="fila-icono" style="background:${o ? colorOrgano(o.sigla) : TIPOS[p.tipo].color}">${ico}</span>
       <span class="fila-txt">
         <span class="fila-titulo">${esc(o ? o.sigla + ' · ' + o.nombre : p.nombre)}</span>
         <span class="fila-sub">${esc(o ? 'Sesiona en ' + p.nombre : (p.det || TIPOS[p.tipo].etiqueta))}</span>
@@ -302,14 +313,15 @@ function pintarLista() {
 function pintarCronograma() {
   // mientras nadie toque las pestanas, la vista sigue al dia que corre
   if (!jornadaElegidaAMano) jornadaVisible = cron.jornadaPorDefecto();
-  const track = miTrack();
-  const o = miOrgano();
+  const track = trackVisible();
+  const o = organoVisible();
+  jornadaVisible=Math.min(jornadaVisible,CRONOGRAMA.length-1);
   pintarAhora();
 
   $('#tabs-jornada').innerHTML = CRONOGRAMA.map((j, i) => {
-    const hoy = new Date().toISOString().slice(0, 10) === j.fecha;
+    const hoy = cron.fechaLocal() === j.fecha;
     return `<button type="button" role="tab" class="tab-jornada" data-i="${i}"
-      aria-selected="${i === jornadaVisible}" data-hoy="${hoy ? 1 : 0}">
+      id="jornada-${i}" aria-controls="bloques" tabindex="${i===jornadaVisible?0:-1}" aria-selected="${i === jornadaVisible}" data-hoy="${hoy ? 1 : 0}">
       ${esc(j.titulo)}<small>${esc(j.subtitulo)}</small></button>`;
   }).join('');
   $('#tabs-jornada').onclick = (e) => {
@@ -320,6 +332,8 @@ function pintarCronograma() {
     pintarCronograma();
   };
 
+  $('#bloques').setAttribute('aria-labelledby','jornada-'+jornadaVisible);
+  $('#tabs-jornada').onkeydown=e=>{const step={ArrowRight:1,ArrowLeft:-1,Home:0,End:0}[e.key];if(step===undefined)return;e.preventDefault();jornadaVisible=e.key==='Home'?0:e.key==='End'?CRONOGRAMA.length-1:(jornadaVisible+step+CRONOGRAMA.length)%CRONOGRAMA.length;jornadaElegidaAMano=true;pintarCronograma();$('#jornada-'+jornadaVisible).focus();};
   const ahora = new Date();
   const j = CRONOGRAMA[jornadaVisible];
   const bloques = cron.todosLosBloques().filter((b) => b.jornada.fecha === j.fecha);
@@ -327,8 +341,9 @@ function pintarCronograma() {
   const intro = o
     ? `<p class="lista-grupo">Cronograma de ${esc(o.sigla)} · ${esc(cron.nombreTrack(o.track))}</p>`
     : '<p class="lista-grupo">Elegí tu órgano arriba para ver solo lo tuyo</p>';
+  const consulta=organoConsulta?'<button type="button" class="btn-sec" id="volver-mi-cronograma">Volver a mi cronograma</button>':'';
 
-  $('#bloques').innerHTML = intro + bloques.map((b) => {
+  $('#bloques').innerHTML = intro + consulta + bloques.map((b) => {
     const esAhora = ahora >= b.inicio && ahora < b.fin;
     const pasado = ahora >= b.fin;
     let cuerpo;
@@ -341,7 +356,7 @@ function pintarCronograma() {
       cuerpo = cron.columnasBloque(b).map((c) =>
         `<div class="bloque-col"><b>${esc(cron.nombreTrack(c.track))}:</b> ${esc(c.texto)}</div>`).join('');
     }
-    const irSede = (!b.todos && o)
+    const irSede = b.lugar ? `<button type="button" class="bloque-ir" data-sede="${esc(b.lugar)}">Ver dónde es</button>` : (!b.todos && o)
       ? `<button type="button" class="bloque-ir" data-sede="org-${o.sigla.toLowerCase()}">Ver dónde es</button>`
       : '';
     return `<div class="bloque bloque-${b.tipo || 'sesion'}${esAhora ? ' bloque-ahora' : ''}${pasado ? ' bloque-pasado' : ''}">
@@ -350,6 +365,7 @@ function pintarCronograma() {
     </div>`;
   }).join('');
 
+  $('#volver-mi-cronograma')?.addEventListener('click',()=>{organoConsulta=null;pintarCronograma();});
   $('#bloques').onclick = (e) => {
     const b = e.target.closest('[data-sede]');
     if (!b) return;
@@ -360,7 +376,7 @@ function pintarCronograma() {
 function pintarAhora() {
   const ahora = new Date();
   const { estado, actual, siguiente } = cron.estadoEn(ahora);
-  const track = miTrack();
+  const track = trackVisible();
   const el = $('#ahora');
 
   if (estado === 'antes') {
@@ -397,7 +413,8 @@ function pintarAhora() {
 }
 
 setInterval(() => {
-  if (!$('#vista-cronograma').hidden) pintarAhora();
+  if (!$('#vista-cronograma').hidden) {const f=document.activeElement?.id;pintarCronograma();if(f)document.getElementById(f)?.focus({preventScroll:true});}
+  const id=mapa?.seleccionActual();if(id&&mapa) pintarFicha(mapa.puntos.find(p=>p.id===id),mapa.ubicacion());
 }, 30000);
 
 // ===========================================================================
@@ -422,10 +439,10 @@ function pintarResultados(q) {
     const p = r.punto;
     const d = distanciaA(p, u);
     const ico = r.sigla
-      ? `<img src="img/logos/${r.sigla}.webp" alt="" width="192" height="192">`
+      ? logoOrgano(r.sigla)
       : icono(p.tipo);
     return `<li><button type="button" class="fila" data-id="${esc(p.id)}">
-      <span class="fila-icono" style="background:${r.sigla ? `var(--c-${r.sigla.toLowerCase()})` : TIPOS[p.tipo].color}">${ico}</span>
+      <span class="fila-icono" style="background:${r.sigla ? colorOrgano(r.sigla) : TIPOS[p.tipo].color}">${ico}</span>
       <span class="fila-txt">
         <span class="fila-titulo">${esc(r.titulo)}</span>
         <span class="fila-sub">${esc(r.subtitulo)}</span>
@@ -537,6 +554,7 @@ function pintarInfo() {
   partes.push(`<h2 class="lista-grupo">La app</h2>
     <div class="tarjeta">
       <h2>Guardala en tu celular</h2>
+      <button type="button" class="btn-sec" id="preparar-offline">Descargar para usar sin conexión</button><p id="offline-resultado" role="status"></p>
       <p>Desde el menú del navegador elegí <b>“Agregar a pantalla de inicio”</b> (en iPhone está dentro del botón de compartir).
       Así se abre como una app y sigue funcionando aunque te quedes sin señal en el predio.</p>
     </div>
@@ -557,6 +575,7 @@ function pintarInfo() {
 
   $('#info-contenido').innerHTML = partes.join('');
 
+  $('#preparar-offline').onclick=async e=>{e.target.disabled=true;$('#offline-resultado').textContent='Descargando mapa…';try{await prepararOffline();$('#offline-resultado').textContent='Listo. El mapa está disponible sin conexión.';}catch(err){$('#offline-resultado').textContent=err.message;}finally{e.target.disabled=false;}};
   const verSede = $('#info-ver-sede');
   if (verSede) verSede.addEventListener('click', () => {
     verEnElMapa('org-' + o.sigla.toLowerCase());
@@ -578,12 +597,13 @@ function pintarInfo() {
 let elegido = { organo: null };
 
 function abrirPerfil() {
+  $('#modal-perfil').returnValue='';
   elegido = { ...obtenerPerfil() };
   $('#grilla-organos').innerHTML = ORGANOS.map((o) => `
     <button type="button" class="op-organo" data-sigla="${esc(o.sigla)}"
       aria-pressed="${elegido.organo === o.sigla}">
-      <img src="img/logos/${o.sigla}.webp" alt="" width="192" height="192">
-      ${esc(o.sigla)}
+      ${logoOrgano(o.sigla)}
+      <b>${esc(o.sigla)}</b><span>${esc(o.nombre)}</span>
     </button>`).join('');
   $('#modal-perfil').showModal();
 }
@@ -601,8 +621,8 @@ $('#modal-perfil').addEventListener('close', () => {
     if (elegido.organo && mapa) {
       verEnElMapa('org-' + elegido.organo.toLowerCase(), 120);
     }
-  } else {
-    guardarPerfil({ listo: true });
+  } else if($('#modal-perfil').returnValue==='omitir') {
+    guardarPerfil({ organo:null,listo:true });
   }
 });
 
@@ -612,7 +632,7 @@ function pintarChip() {
   const o = miOrgano();
   const el = $('#btn-perfil');
   if (o) {
-    el.innerHTML = `<img src="img/logos/${o.sigla}.webp" alt="" width="192" height="192">
+    el.innerHTML = `${logoOrgano(o.sigla)}
                     <span>${esc(o.sigla)}</span>`;
     el.setAttribute('aria-label', `Tu órgano: ${o.sigla}. Tocá para cambiarlo.`);
   } else {
@@ -621,87 +641,17 @@ function pintarChip() {
   }
 }
 alCambiarPerfil(() => {
+  organoConsulta=null;
   pintarChip();
   if (!$('#vista-cronograma').hidden) pintarCronograma();
   if (!$('#vista-info').hidden) pintarInfo();
 });
 
 // ===========================================================================
-//  PORTADA
-//  El logo se dibuja de cero mientras carga el mapa, y se muestra SIEMPRE:
-//  es la primera impresion de la app. Lo unico que la puede acortar es que
-//  la red este muy mal (hay un tope) o que el sistema pida menos animacion.
-// ===========================================================================
-const espera = (ms) => new Promise((r) => setTimeout(r, ms));
-const DURACION_PORTADA = 1450;   // lo que dura splash.webp, en ms
-const TOPE_PORTADA = 7000;       // pase lo que pase, a los 7 s la portada se va
-
-function portada() {
-  const el = $('#portada');
-  if (!el) return Promise.resolve();
-  const img = $('#portada-anim');
-  const menosMovimiento = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let urlBlob = null;
-
-  /** Pone una imagen y avisa cuando termino de cargar (o de fallar). */
-  function mostrar(url) {
-    return new Promise((res) => {
-      img.addEventListener('load', res, { once: true });
-      img.addEventListener('error', res, { once: true });
-      img.src = url;
-    });
-  }
-
-  // Un webp animado con una sola vuelta no vuelve a empezar si el navegador
-  // reusa la imagen que ya tiene decodificada: se ve el ultimo cuadro, quieto,
-  // como si la animacion nunca hubiera ocurrido. Con un blob distinto en cada
-  // carga siempre arranca del primer cuadro. El archivo no se vuelve a bajar:
-  // el <link rel=preload> del index ya lo dejo en el cache.
-  const dibujada = menosMovimiento
-    ? mostrar('img/splash-fijo.webp')
-    // sin opciones a proposito: asi coincide con el <link rel=preload
-    // crossorigin=anonymous> del index y se reusa esa descarga
-    : fetch('img/splash.webp')
-        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('splash'))))
-        .then((b) => { urlBlob = URL.createObjectURL(b); return mostrar(urlBlob); })
-        .catch(() => mostrar('img/splash.webp'));
-
-  const mapaListo = new Promise((res) => {
-    const fondo = $('#mapa-fondo');
-    if (!fondo || fondo.complete) { res(); return; }
-    fondo.addEventListener('load', res, { once: true });
-    fondo.addEventListener('error', res, { once: true });
-  });
-
-  const secuencia = dibujada
-    .then(() => {
-      if (menosMovimiento) return espera(500);
-      // el webp dura 1,4 s; le damos ese tiempo desde que se lo pudo ver, y de
-      // paso esperamos al mapa para no mostrar un recuadro vacio. Con tope: la
-      // app se abre muchas veces por dia, no puede tardar mas que eso.
-      return Promise.all([espera(DURACION_PORTADA),
-                          Promise.race([mapaListo, espera(1500)])]);
-    })
-    .then(() => {
-      el.classList.add('saliendo');
-      return espera(menosMovimiento ? 0 : 450);
-    });
-
-  // El tope no es decorativo: si algo de esto se cuelga, la app tiene que
-  // aparecer igual. Una portada trabada equivale a una app rota.
-  return Promise.race([secuencia, espera(TOPE_PORTADA)])
-    .catch(() => {})
-    .then(() => {
-      el.hidden = true;
-      if (urlBlob) URL.revokeObjectURL(urlBlob);
-    });
-}
-
-// ===========================================================================
 //  ARRANQUE
 // ===========================================================================
 iniciarMapa();
-const portadaTerminada = portada();
+
 pintarChip();
 pintarAtajos();
 verComo('mapa');
@@ -709,9 +659,21 @@ verComo('mapa');
 const vistaInicial = (location.hash || '').replace('#', '');
 irA(['mapa', 'cronograma', 'buscar', 'info'].includes(vistaInicial) ? vistaInicial : 'mapa', false);
 
-// el modal no debe taparle la portada a nadie: espera a que termine
-portadaTerminada.then(() => {
-  if (!obtenerPerfil().listo) setTimeout(abrirPerfil, 260);
+// La elección de órgano es opcional y no interrumpe el acceso al mapa.
+$('#buscar-en-mapa').onclick=()=>irA('buscar');
+$('#mi-sede').onclick=()=>{const o=miOrgano();if(o)verEnElMapa('org-'+o.sigla.toLowerCase());else abrirPerfil();};
+$$('[data-busqueda]').forEach(b=>b.onclick=()=>{irA('buscar');$('#q').value=b.dataset.busqueda;pintarResultados(b.dataset.busqueda);});
+let revisionVista=publicacion.revision;
+alCambiarDatos(()=>{
+  if(revisionVista===publicacion.revision)return;
+  revisionVista=publicacion.revision;
+  const seleccion=mapa.seleccionActual();
+  mapa.setDatos(obtenerDatos());
+  if(seleccion&&!mapa.seleccionActual())avisar('El lugar seleccionado ya no está en la publicación actual.');
+  pintarChip();pintarAtajos();pintarResultados($('#q').value);
+  if(!$('#lista-lugares').hidden)pintarLista();
+  if(!$('#vista-cronograma').hidden)pintarCronograma();
+  if(!$('#vista-info').hidden)pintarInfo();
 });
 
 // ---------------------------------------------------------- service worker
@@ -725,8 +687,8 @@ const ES_DESARROLLO = ['localhost', '127.0.0.1', '::1', ''].includes(location.ho
 
 if ('serviceWorker' in navigator && ES_DESARROLLO) {
   navigator.serviceWorker.getRegistrations()
-    .then((rs) => Promise.all(rs.map((r) => r.unregister())))
-    .then(() => (self.caches ? caches.keys().then((ks) => Promise.all(ks.map((k) => caches.delete(k)))) : null))
+    .then((rs) => Promise.all(rs.filter(r=>r.scope===new URL('./',location.href).href).map((r) => r.unregister())))
+    .then(() => (self.caches ? caches.keys().then((ks) => Promise.all(ks.filter(k=>k.startsWith('minulp-')).map((k) => caches.delete(k)))) : null))
     .catch(() => {});
 } else if ('serviceWorker' in navigator) {
   // Si ya habia una version corriendo y entra a mandar una nueva, recargamos
@@ -735,9 +697,9 @@ if ('serviceWorker' in navigator && ES_DESARROLLO) {
   const yaHabia = !!navigator.serviceWorker.controller;
   let recargando = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!yaHabia || recargando || performance.now() > 12000) return;
+    if (!yaHabia || recargando) return;
     recargando = true;
-    location.reload();
+    avisar('Hay una nueva versión de la aplicación. Estará disponible al volver a abrirla.');
   });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});

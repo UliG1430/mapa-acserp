@@ -1,0 +1,26 @@
+{
+  "name": "mapa-acserp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "node server/local.js",
+    "start": "node server/local.js",
+    "test": "node --test tests/*.test.js",
+    "build": "node scripts/build.js",
+    "check": "node scripts/check.js",
+    "test:load": "node scripts/load.js"
+  },
+  "devDependencies": {
+    "drizzle-kit": "0.31.10",
+    "drizzle-orm": "0.45.2",
+    "esbuild": "0.28.2",
+    "happy-dom": "20.14.0"
+  },
+  "overrides": {
+    "esbuild": "$esbuild"
+  }
+}

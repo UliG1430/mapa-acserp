@@ -1,87 +1,19 @@
-// ============================================================================
-//  sw.js — cache offline. La app entera pesa ~1 MB, asi que la guardamos toda.
-//  Al publicar una version nueva, cambiar VERSION: eso invalida el cache viejo.
-//
-//  REGLA DE ORO: una carga tiene que servirse ENTERA de la misma version.
-//  Antes el html se pedia a la red y el resto salia del cache, asi que despues
-//  de publicar un cambio quedaba el html nuevo con el javascript y las imagenes
-//  viejas. Eso se veia como cosas raras que "se arreglaban recargando": un logo
-//  de una version anterior, una animacion que no arrancaba, la app trabada en
-//  la portada. Ahora todo sale del cache y de fondo se busca lo nuevo, que
-//  queda listo para la proxima vez (app.js recarga solo si recien abriste).
-// ============================================================================
-
-const VERSION = 'minulp-2026-v12';
-
-const ARCHIVOS = [
-  './',
-  'index.html',
-  'editor.html',
-  'imprimir.html',
-  'manifest.webmanifest',
-  'css/app.css',
-  'css/fuente.css',
-  'fonts/montserrat-latin.woff2',
-  'css/marcas.css',
-  'js/app.js',
-  'js/datos.js',
-  'js/geo.js',
-  'js/mapa.js',
-  'js/cronograma.js',
-  'js/buscador.js',
-  'js/perfil.js',
-  'js/qr.js',
-  'js/escribir-datos.js',
-  'img/mapa.webp',
-  'img/mapa@2x.webp',
-  'img/oficial.webp',
-  'img/entorno.svg',
-  'img/splash.webp',
-  'img/splash-fijo.webp',
-  'img/icons/icon-192.png',
-  'img/icons/icon-512.png',
-  'img/icons/icon-maskable.png',
-  'img/logos/ACNUR.webp', 'img/logos/AG.webp', 'img/logos/CAJ.webp', 'img/logos/CDH.webp',
-  'img/logos/CS.webp', 'img/logos/ECOSOC.webp', 'img/logos/OIT.webp', 'img/logos/OMS.webp',
-  'img/logos/ONUDD.webp', 'img/logos/ONUM.webp', 'img/logos/PNUMA.webp', 'img/logos/STI.webp',
-  'img/logos/UNESCO.webp', 'img/logos/UNICEF.webp', 'img/logos/UNODA.webp',
-  'img/logos/MINULP.webp', 'img/logos/MINULP-BLANCO.webp',
-];
-
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(VERSION)
-      // addAll falla entero si falta un archivo: guardamos de a uno para ser tolerantes
-      .then((c) => Promise.all(ARCHIVOS.map((u) => c.add(u).catch(() => {}))))
-      .then(() => self.skipWaiting()),
-  );
+// El build reemplaza BUILD_ID con el hash del código. El shell de cada versión
+// es inmutable: una página abierta nunca mezcla archivos de distintas versiones.
+const VERSION='minulp-shell-BUILD_ID';
+const OPTIONAL_CACHE=VERSION+'-opcional';
+const SHELL=['./','index.html','manifest.webmanifest','css/app.css','css/marcas.css','css/fuente.css','fonts/montserrat-latin.woff2','js/app.js','js/datos.js','js/validacion.js','js/seguridad.js','js/organos.js','js/estado-publico.js','js/mapa.js','js/geo.js','js/cronograma.js','js/buscador.js','js/perfil.js','data/inicial.json','img/mapa.webp','img/entorno.svg','img/icons/icon-192.png','img/logos/MINULP-BLANCO.webp',...['AG','STI','CS','ECOSOC','CDH','ONUM','PNUMA','UNESCO','ACNUR','UNICEF','OMS','CAJ','OIT','ONUDD','UNODA'].map(s=>'img/logos/'+s+'.webp')];
+const OPTIONAL=['img/mapa@2x.webp','img/oficial.webp','imprimir.html','css/imprimir.css','js/imprimir.js','js/qr.js'];
+self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(SHELL)));});
+// Sin skipWaiting/claim: activar cuando ya no haya páginas de la versión previa.
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('minulp-')&&k!==VERSION&&k!==OPTIONAL_CACHE).map(k=>caches.delete(k)))));});
+self.addEventListener('fetch',e=>{
+ const url=new URL(e.request.url);if(url.origin!==self.location.origin||e.request.method!=='GET')return;
+ if(url.pathname.includes('/api/')||url.pathname.includes('/public/')||url.searchParams.has('preview'))return;
+ const resource=url.pathname.replace(new URL(self.registration.scope).pathname,'');
+ if(resource==='editor.html'||resource==='js/editor.js'||resource==='css/editor.css')return;
+ const name=resource||'./';
+ if(SHELL.includes(name))e.respondWith(caches.open(VERSION).then(async cache=>(await cache.match(new URL(name,self.registration.scope).href))||fetch(e.request)));
+ else if(OPTIONAL.includes(name))e.respondWith(caches.open(OPTIONAL_CACHE).then(async cache=>{const hit=await cache.match(e.request);if(hit)return hit;const r=await fetch(e.request);if(r.ok)await cache.put(e.request,r.clone());return r;}));
 });
-
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys()
-      .then((ks) => Promise.all(ks.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
-  );
-});
-
-self.addEventListener('fetch', (e) => {
-  const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-
-  // Servimos del cache (por eso anda sin senal) y de fondo pedimos la version
-  // nueva. Asi, si se publica una correccion, la proxima vez que alguien abra
-  // la app ya la tiene, sin necesidad de borrar nada a mano.
-  e.respondWith(
-    caches.open(VERSION).then((cache) => cache.match(req).then((hit) => {
-      const red = fetch(req)
-        .then((r) => {
-          if (r && r.ok) cache.put(req, r.clone());
-          return r;
-        })
-        // sin senal y sin copia: si es una navegacion, al menos damos la portada
-        .catch(() => hit || (req.mode === 'navigate' ? caches.match('index.html') : undefined));
-      return hit || red;
-    })),
-  );
-});
+self.addEventListener('message',e=>{if(e.data?.type!=='PREPARAR_OFFLINE')return;e.waitUntil(Promise.all([caches.open(VERSION).then(c=>c.addAll(SHELL)),caches.open(OPTIONAL_CACHE).then(c=>c.addAll(OPTIONAL))]).then(()=>e.ports[0]?.postMessage({ok:true}),()=>e.ports[0]?.postMessage({ok:false})));});

@@ -1,0 +1,523 @@
+
+    /* ===========================================================================
+   Mapa imprimible. La hoja se dibuja en milimetros reales: en pantalla se
+   escala para que entre en el preview, y al imprimir sale a tamano natural.
+   =========================================================================== */
+    body {
+      display: block;
+      background: var(--papel-3);
+    }
+
+    .pi-cab {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 10px 16px;
+      background: var(--navy);
+      color: #fff;
+    }
+
+    .pi-cab h1 {
+      font-size: 1rem;
+      margin: 0;
+      flex: 1 1 auto;
+    }
+
+    .pi-cab .btn-pri {
+      flex: 0 0 auto;
+      background: #fff;
+      color: var(--navy);
+    }
+
+    .pi-cab a {
+      color: #c9cdf0;
+      font-size: .85rem;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .pi-cuerpo {
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+      padding: 16px;
+    }
+
+    .pi-panel {
+      flex: 0 0 268px;
+      position: sticky;
+      top: 64px;
+      background: var(--papel);
+      border: 1px solid var(--borde);
+      border-radius: var(--r);
+      padding: 14px;
+    }
+
+    .pi-panel h2 {
+      font-size: .74rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--tinta-2);
+      margin: 14px 0 7px;
+    }
+
+    .pi-panel h2:first-child {
+      margin-top: 0;
+    }
+
+    .pi-op {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-height: 34px;
+      cursor: pointer;
+      font-size: .88rem;
+    }
+
+    .pi-op input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--navy);
+      flex: 0 0 auto;
+    }
+
+    .pi-op img {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+    }
+
+    .pi-punto {
+      border-radius: 50%;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+    }
+
+    .pi-punto svg {
+      fill: #fff;
+      display: block;
+    }
+
+    .pi-op .pi-punto {
+      width: 16px;
+      height: 16px;
+    }
+
+    .pi-op .pi-punto svg {
+      width: 10px;
+      height: 10px;
+    }
+
+    .pi-sub {
+      padding-left: 4px;
+      border-left: 2px solid var(--borde);
+      margin-left: 8px;
+    }
+
+    .pi-mini {
+      font-size: .78rem;
+      color: var(--tinta-2);
+      margin: 4px 0 0;
+    }
+
+    .pi-fila-btn {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .pi-fila-btn button {
+      flex: 1 1 auto;
+      min-height: 32px;
+      font-size: .78rem;
+      font-weight: 600;
+      border: 1px solid var(--borde);
+      border-radius: 8px;
+      background: var(--papel-2);
+      color: var(--tinta);
+      cursor: pointer;
+    }
+
+    .pi-lienzo {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: grid;
+      place-items: start center;
+    }
+
+    .pi-escala {
+      transform-origin: top center;
+    }
+
+    /* ------------------------------------------------------------------- hoja */
+    .hoja {
+      width: 297mm;
+      height: 210mm;
+      background: #fff;
+      color: #14161f;
+      position: relative;
+      /* referencia para medir sin el transform */
+      display: flex;
+      overflow: hidden;
+      box-shadow: 0 6px 30px rgba(0, 0, 0, .22);
+      font-family: var(--tipo);
+    }
+
+    .hoja[data-orient="vertical"] {
+      width: 210mm;
+      height: 297mm;
+      flex-direction: column;
+    }
+
+    .hoja-izq {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      padding: 7mm 0 5mm 7mm;
+    }
+
+    .hoja-mapa {
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .hoja[data-orient="apaisado"] .hoja-mapa {
+      width: 186mm;
+      height: 186mm;
+    }
+
+    .hoja[data-orient="vertical"] .hoja-izq {
+      padding: 6mm 7mm 3mm;
+    }
+
+    .hoja[data-orient="vertical"] .hoja-mapa {
+      width: 158mm;
+      height: 158mm;
+      margin: 0 auto;
+    }
+
+    .hoja-mapa img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 2mm;
+    }
+
+    .hoja-lado {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 7mm 7mm 6mm 6mm;
+    }
+
+    .hoja[data-orient="vertical"] .hoja-lado {
+      padding: 0 7mm 6mm;
+      flex: 1 1 auto;
+    }
+
+    .hoja[data-orient="vertical"] .hoja-titulo {
+      margin-bottom: 2.5mm;
+    }
+
+    .hoja-titulo {
+      display: flex;
+      align-items: center;
+      gap: 4mm;
+      margin-bottom: 3.5mm;
+    }
+
+    .hoja-titulo img {
+      width: 22mm;
+      height: 22mm;
+      flex: 0 0 auto;
+    }
+
+    .hoja-titulo b {
+      display: block;
+      font-size: 6.4mm;
+      line-height: 1.05;
+      color: #0e153e;
+      white-space: nowrap;
+    }
+
+    .hoja-titulo span {
+      font-size: 2.8mm;
+      color: #4b5060;
+      line-height: 1.35;
+      display: block;
+    }
+
+    .refs-tit {
+      background: #0e153e;
+      color: #fff;
+      border-radius: 2mm;
+      padding: 1.6mm 3mm;
+      font-size: 3.6mm;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 3mm;
+      display: inline-block;
+    }
+
+    .refs {
+      column-gap: 6mm;
+      font-size: 2.9mm;
+    }
+
+    .refs[data-cols="1"] {
+      columns: 1;
+    }
+
+    .refs[data-cols="2"] {
+      columns: 2;
+    }
+
+    .refs[data-cols="3"] {
+      columns: 3;
+    }
+
+    .refs-grupo {
+      margin-bottom: 3mm;
+    }
+
+    .refs-grupo>p {
+      break-after: avoid;
+    }
+
+    /* el titulo no queda solo al pie de una columna */
+    .refs-grupo>p {
+      margin: 0 0 1.2mm;
+      font-size: 2.6mm;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: #6b7080;
+      break-after: avoid;
+    }
+
+    .ref {
+      display: flex;
+      align-items: flex-start;
+      gap: 2mm;
+      margin-bottom: 1.4mm;
+      break-inside: avoid;
+      line-height: 1.25;
+    }
+
+    .ref>span:not(.pi-punto) {
+      padding-top: .8mm;
+    }
+
+    .ref img {
+      width: 6mm;
+      height: 6mm;
+      border-radius: 50%;
+      flex: 0 0 auto;
+    }
+
+    .ref .pi-punto {
+      width: 6mm;
+      height: 6mm;
+    }
+
+    .ref .pi-punto svg {
+      width: 3.6mm;
+      height: 3.6mm;
+    }
+
+    .ref b {
+      font-weight: 700;
+    }
+
+    .ref span {
+      color: #4b5060;
+    }
+
+    .hoja-pie {
+      margin-top: 3mm;
+      padding-top: 2.5mm;
+      border-top: .3mm solid #d5d8e2;
+      font-size: 2.5mm;
+      color: #6b7080;
+      line-height: 1.5;
+    }
+
+    .hoja-pie b {
+      color: #14161f;
+      font-weight: 700;
+    }
+
+    /* ------------------------------------------------------- marcas en la hoja */
+    .hoja-qr {
+      position: absolute;
+      right: 2mm;
+      bottom: 2mm;
+      width: 46mm;
+      padding: 2.5mm 2.5mm 2mm;
+      background: rgba(255, 255, 255, .93);
+      border-radius: 2mm;
+      box-shadow: 0 .3mm 1mm rgba(0, 0, 0, .25);
+      text-align: center;
+    }
+
+    .hoja-qr[hidden] {
+      display: none;
+    }
+
+    .hoja-qr svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .hoja-qr b {
+      display: block;
+      margin-top: 1.2mm;
+      font-size: 2.9mm;
+      line-height: 1.25;
+      color: #0e153e;
+      word-break: break-all;
+    }
+
+    .hoja-qr i {
+      display: block;
+      margin-top: 1.4mm;
+      font-size: 2.7mm;
+      font-style: normal;
+      color: #4b5060;
+    }
+
+    .hm {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+
+    .hm-aqui {
+      transform: translate(-50%, -100%);
+      /* la punta del pin va sobre el lugar */
+      z-index: 3;
+    }
+
+    .hm-aqui svg {
+      width: 9mm;
+      height: 12.7mm;
+      display: block;
+      margin: 0 auto;
+      filter: drop-shadow(0 .3mm .6mm rgba(0, 0, 0, .45));
+    }
+
+    .hm-aqui .hm-rot {
+      position: static;
+      display: inline-block;
+      margin-top: .6mm;
+      background: #b0113a;
+      color: #fff;
+      font-size: 2.6mm;
+      letter-spacing: .04em;
+      padding: .5mm 1.4mm;
+      border-radius: 1mm;
+    }
+
+    .mapa-clic {
+      cursor: crosshair;
+    }
+
+    .hm-disco {
+      width: 7mm;
+      height: 7mm;
+      border-radius: 50%;
+      border: .5mm solid #fff;
+      box-shadow: 0 .3mm .8mm rgba(0, 0, 0, .4);
+      display: grid;
+      place-items: center;
+      margin: 0 auto;
+    }
+
+    .hm-disco img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      display: block;
+    }
+
+    .hm-disco svg {
+      width: 4mm;
+      height: 4mm;
+      fill: #fff;
+    }
+
+    .hm-serv .hm-disco {
+      width: 5mm;
+      height: 5mm;
+      border-width: .4mm;
+    }
+
+    .hm-serv .hm-disco svg {
+      width: 3mm;
+      height: 3mm;
+    }
+
+    .hm-rot {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: .4mm;
+      padding: .2mm 1mm;
+      border-radius: .8mm;
+      background: rgba(255, 255, 255, .92);
+      font-size: 2.5mm;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 .2mm .5mm rgba(0, 0, 0, .25);
+    }
+
+    /* ------------------------------------------------------------- impresion */
+    @media print {
+      @page {
+        margin: 0;
+      }
+
+      /* el tamaño lo pone la regla que inyecta el script */
+      html,
+      body {
+        background: #fff;
+        height: auto;
+      }
+
+      .pi-cab,
+      .pi-panel {
+        display: none !important;
+      }
+
+      .pi-cuerpo {
+        display: block;
+        padding: 0;
+      }
+
+      .pi-lienzo {
+        display: block;
+      }
+
+      /* la escala es solo para el preview: en papel la hoja va a tamaño natural */
+      .pi-escala {
+        transform: none !important;
+        height: auto !important;
+      }
+
+      .hoja {
+        box-shadow: none;
+      }
+
+      * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }

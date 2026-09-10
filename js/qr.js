@@ -1,3 +1,4 @@
+import {esc} from './seguridad.js';
 // ============================================================================
 //  qr.js — generador de codigos QR (modo byte, correccion M, versiones 1 a 10).
 //
@@ -386,7 +387,7 @@ export function svgQR(texto, { borde = 4, color = '#0e153e', fondo = '#fff' } = 
     }
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${lado} ${lado}" ` +
-         `shape-rendering="crispEdges" role="img" aria-label="Código QR de ${texto}">` +
-         `<rect width="${lado}" height="${lado}" fill="${fondo}"/>` +
-         `<path d="${partes.join('')}" fill="${color}"/></svg>`;
+         `shape-rendering="crispEdges" role="img" aria-label="Código QR de ${esc(texto)}">` +
+         `<rect width="${lado}" height="${lado}" fill="${esc(fondo)}"/>` +
+         `<path d="${partes.join('')}" fill="${esc(color)}"/></svg>`;
 }
