@@ -1,10 +1,17 @@
 # Despliegue del mapa
 
-Estado: implementación y base de pruebas locales. No se desplegó el mapa online ni se modificó main.
+Estado: listo para conectar la rama `main` a Netlify. No se realizó el deploy online.
 
 ## Cuenta y almacenamiento
 
-Auth utiliza la cuenta existente de `web-acserp`, autorizada por correo en el servidor. El mapa guarda sus datos y sesiones en su propia SQLite/D1; no crea tablas ni políticas en las bases de `web-acserp` o `inscripciones-acserp`.
+Auth utiliza la cuenta existente de `web-acserp`, autorizada por correo en el servidor. En Netlify, el mapa guarda publicaciones, borradores y sesiones en su store aislado de Netlify Blobs; no crea tablas ni políticas en las bases de `web-acserp` o `inscripciones-acserp`.
+
+## Netlify
+
+1. Crear un proyecto desde este repositorio y seleccionar la rama `main`. `netlify.toml` ya define `npm run build`, `dist/client`, Functions y Node 22.
+2. Configurar `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY` con los mismos valores de `web-acserp`; agregar `EDITOR_EMAILS`, una `SESSION_ENCRYPTION_KEY` hexadecimal de 64 caracteres, `NODE_ENV=production` y `APP_ORIGIN=https://mapa.acserp.org.ar`.
+3. Asignar `mapa.acserp.org.ar` como dominio de producción. Netlify aprovisiona automáticamente Blobs para el proyecto cuando la Function lo usa.
+4. Tras el primer deploy, probar login, guardado de borrador, publicación y persistencia después de un redeploy.
 
 Se intentó crear el proyecto Supabase separado `mapa-acserp` en ACSERP, después de confirmar organización y consultar costo. Supabase rechazó la creación por el límite de dos proyectos gratuitos activos. No se creó un proyecto nuevo, no se pausaron proyectos y no se contrató un plan. Compartir Auth permite usar las credenciales actuales, pero no equivale a tener un proyecto Supabase separado.
 
@@ -36,4 +43,4 @@ Las migraciones son incrementales; mantenerlas en Git. Nunca reemplazar la base 
 
 Tras desplegar, verificar en el dominio real: login autorizado, rechazo de otra cuenta y acceso anónimo a borradores, cookie Secure, logout, publicación en dos dispositivos, conflicto entre editores, versión pública por CDN, recuperación offline y persistencia tras reiniciar. Confirmar que `.env`, `.git`, DB, migraciones y fuentes del servidor devuelven 404. Revisar logs sin guardar contraseñas, códigos, cookies o tokens.
 
-Falta confirmar el dominio y el plan concreto de Hostinger para elegir y ejecutar el despliegue.
+La alternativa Node/Cloudflare se conserva como opción fuera de Netlify; para el deploy pedido usar la sección Netlify.

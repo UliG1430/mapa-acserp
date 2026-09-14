@@ -1,6 +1,6 @@
 # Mapa ACSERP / MINULP
 
-Mapa público y editor con borradores, vista previa, historial y publicación. Implementación en la rama `pruebas-pedro`; no requiere modificar archivos de código para actualizar lugares o actividades.
+Mapa público y editor con borradores, vista previa, historial y publicación. No requiere modificar archivos de código para actualizar lugares o actividades.
 
 ## Probar en local
 
@@ -45,7 +45,7 @@ La prueba de carga se ejecuta únicamente contra localhost con el servidor inici
 
 ## Despliegue
 
-**Un push a main por sí solo no habilita el servicio online.** Se necesita desplegar el servidor, una base persistente y configurar HTTPS y secretos. El frontend estático sin `/api` y `/public` no permite publicar.
+El repositorio está preparado para Netlify: `npm run build` publica `dist/client`, las rutas `/api/*` y `/public/*` se sirven con una Function y el estado persistente vive en Netlify Blobs. Configurá en Netlify las variables de `.env.example`; `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY` deben ser los mismos valores que usa `web-acserp`.
 
 - [Opciones y pasos de despliegue](docs/despliegue.md)
 - [Revisión de seguridad y límites](docs/seguridad.md)

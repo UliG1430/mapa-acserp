@@ -22,5 +22,8 @@
   },
   "overrides": {
     "esbuild": "$esbuild"
+  },
+  "dependencies": {
+    "@netlify/blobs": "11.1.0"
   }
 }
