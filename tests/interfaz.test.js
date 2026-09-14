@@ -29,8 +29,8 @@ function closeDialog(w,value='ok'){const d=w.document.querySelector('#ed-dialog'
 test('vista pública carga, navega, limpia perfil y revela destino filtrado',async()=>{const DB=abrirDB(':memory:');let app;try{
  app=await render('index.html',{DB,LOCAL_USER:'test'});const{win,doc}=app;assert.equal(doc.querySelectorAll('.marca').length,78);assert.equal(doc.querySelector('#modal-perfil').open,false);
  doc.querySelector('#buscar-en-mapa').click();assert.equal(doc.querySelector('#vista-buscar').hidden,false);
- doc.querySelector('#btn-perfil').click();doc.querySelector('[data-sigla="AG"]').click();const profile=doc.querySelector('#modal-perfil');profile.returnValue='guardar';profile.dispatchEvent(new win.Event('close'));assert.match(doc.querySelector('#btn-perfil').textContent,/AG/);
- doc.querySelector('#btn-perfil').click();profile.returnValue='omitir';profile.dispatchEvent(new win.Event('close'));assert.match(doc.querySelector('#btn-perfil').textContent,/Elegí/);
+ doc.querySelector('#btn-perfil').click();doc.querySelector('[data-sigla="AG"]').click();const profile=doc.querySelector('#modal-perfil'),form=doc.querySelector('#form-perfil');form.dispatchEvent(new win.SubmitEvent('submit',{cancelable:true,submitter:doc.querySelector('button[value="guardar"]')}));assert.match(doc.querySelector('#btn-perfil').textContent,/AG/);
+ doc.querySelector('#btn-perfil').click();form.dispatchEvent(new win.SubmitEvent('submit',{cancelable:true,submitter:doc.querySelector('button[value="omitir"]')}));assert.match(doc.querySelector('#btn-perfil').textContent,/Elegí/);
  doc.querySelector('[data-vista="mapa"]').click();doc.querySelector('.filtro[data-g="sanitario"]').click();doc.querySelector('#buscar-en-mapa').click();const q=doc.querySelector('#q');q.value='baño';q.dispatchEvent(new win.Event('input'));doc.querySelector('#resultados button').click();await wait(100);assert.equal(doc.querySelector('.marca-activa').hidden,false);
  win.location.hash='info';win.dispatchEvent(new win.HashChangeEvent('hashchange'));assert.equal(doc.querySelector('#vista-info').hidden,false);
  }finally{await app?.close();DB.close();}});

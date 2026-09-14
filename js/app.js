@@ -599,6 +599,12 @@ let elegido = { organo: null };
 function abrirPerfil() {
   $('#modal-perfil').returnValue='';
   elegido = { ...obtenerPerfil() };
+  const actual = miOrgano();
+  $('#modal-perfil-ayuda').innerHTML = actual
+    ? `Ahora estás viendo lo de <b>${esc(actual.sigla)}</b>. Tocá otro órgano para cambiarlo,
+       o <b>Ver todo</b> para ver el modelo completo.`
+    : `Sirve para mostrarte tu sede en el mapa y filtrar el cronograma.
+       Se puede modificar cuando quieras.`;
   $('#grilla-organos').innerHTML = ORGANOS.map((o) => `
     <button type="button" class="op-organo" data-sigla="${esc(o.sigla)}"
       aria-pressed="${elegido.organo === o.sigla}">
@@ -615,15 +621,11 @@ $('#grilla-organos').addEventListener('click', (e) => {
   $$('#grilla-organos .op-organo').forEach((x) =>
     x.setAttribute('aria-pressed', String(x.dataset.sigla === elegido.organo)));
 });
-$('#modal-perfil').addEventListener('close', () => {
-  if ($('#modal-perfil').returnValue === 'guardar') {
-    guardarPerfil({ organo: elegido.organo, listo: true });
-    if (elegido.organo && mapa) {
-      verEnElMapa('org-' + elegido.organo.toLowerCase(), 120);
-    }
-  } else if($('#modal-perfil').returnValue==='omitir') {
-    guardarPerfil({ organo:null,listo:true });
-  }
+$('#form-perfil').addEventListener('submit', (e) => {
+  const salida = e.submitter ? e.submitter.value : 'guardar';
+  const organo = salida === 'omitir' ? null : elegido.organo;
+  guardarPerfil({ organo });
+  if (organo && mapa) verEnElMapa('org-' + organo.toLowerCase(), 120);
 });
 
 $('#btn-perfil').addEventListener('click', abrirPerfil);
