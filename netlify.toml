@@ -7,6 +7,45 @@
   NODE_VERSION = "22"
 
 [[redirects]]
+  from = "/editor"
+  to = "/admin"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/editor.html"
+  to = "/admin"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/login"
+  to = "/admin"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/login.html"
+  to = "/admin"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/admin"
+  to = "/admin.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin/"
+  to = "/admin.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin/editor"
+  to = "/admin/editor.html"
+  status = 200
+
+[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/mapa"
   status = 200

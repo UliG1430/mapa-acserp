@@ -3,6 +3,7 @@ import {cp,mkdir,readFile,writeFile,readdir,rm} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 await rm('dist',{recursive:true,force:true});await mkdir('dist/client',{recursive:true});await mkdir('dist/server',{recursive:true});
 for(const f of ['index.html','editor.html','imprimir.html','login.html','manifest.webmanifest','js','css','img','fonts','data'])await cp(f,'dist/client/'+f,{recursive:true});
+await cp('login.html','dist/client/admin.html');await mkdir('dist/client/admin',{recursive:true});await cp('editor.html','dist/client/admin/editor.html');
 const hash=createHash('sha256');
 async function hashTree(dir){for(const name of (await readdir(dir,{withFileTypes:true})).sort((a,b)=>a.name.localeCompare(b.name))){const file=dir+'/'+name.name;if(name.isDirectory())await hashTree(file);else hash.update(file).update(await readFile(file));}}
 await hashTree('dist/client');hash.update(await readFile('sw.js'));const version=hash.digest('hex').slice(0,16);

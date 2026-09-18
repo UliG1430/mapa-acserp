@@ -11,7 +11,7 @@ self.addEventListener('fetch',e=>{
  const url=new URL(e.request.url);if(url.origin!==self.location.origin||e.request.method!=='GET')return;
  if(url.pathname.includes('/api/')||url.pathname.includes('/public/')||url.searchParams.has('preview'))return;
  const resource=url.pathname.replace(new URL(self.registration.scope).pathname,'');
- if(resource==='editor.html'||resource==='js/editor.js'||resource==='css/editor.css')return;
+ if(resource==='editor.html'||resource==='admin/editor'||resource==='admin/editor.html'||resource==='js/editor.js'||resource==='css/editor.css')return;
  const name=resource||'./';
  if(SHELL.includes(name))e.respondWith(caches.open(VERSION).then(async cache=>(await cache.match(new URL(name,self.registration.scope).href))||fetch(e.request)));
  else if(OPTIONAL.includes(name))e.respondWith(caches.open(OPTIONAL_CACHE).then(async cache=>{const hit=await cache.match(e.request);if(hit)return hit;const r=await fetch(e.request);if(r.ok)await cache.put(e.request,r.clone());return r;}));

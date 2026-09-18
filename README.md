@@ -12,7 +12,7 @@ npm run dev
 ```
 
 - Mapa: http://127.0.0.1:5173/
-- Acceso al editor: http://127.0.0.1:5173/login.html
+- Acceso al editor: http://127.0.0.1:5173/admin
 - Impresión: http://127.0.0.1:5173/imprimir.html
 
 El botón **Entrar a la prueba local** permite probar sin credenciales y solo existe en el servidor de desarrollo, limitado a esta computadora. La base `.local/mapa.sqlite` conserva cambios entre reinicios; no se sube a Git. No borrar esa carpeta para actualizar código.
@@ -46,6 +46,8 @@ La prueba de carga se ejecuta únicamente contra localhost con el servidor inici
 ## Despliegue
 
 El repositorio está preparado para Netlify: `npm run build` publica `dist/client`, las rutas `/api/*` y `/public/*` se sirven con una Function y el estado persistente vive en Netlify Blobs. Configurá en Netlify las variables de `.env.example`; `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY` deben ser los mismos valores que usa `web-acserp`.
+
+En producción, el acceso editorial es `https://mapa.acserp.org.ar/admin`; las rutas anteriores `/editor` y `/login` redirigen a esa entrada.
 
 - [Opciones y pasos de despliegue](docs/despliegue.md)
 - [Revisión de seguridad y límites](docs/seguridad.md)

@@ -24,7 +24,7 @@ const server=http.createServer(async(req,res)=>{
       const headers=new Headers(req.headers);headers.delete('oai-authenticated-user-id');headers.delete('oai-authenticated-user-email');
       response=await api(new Request(url,{method:req.method,headers,...(!['GET','HEAD'].includes(req.method)?{body:req,duplex:'half'}:{})}),{...process.env,DB},{local:!production,clientIP:req.socket.remoteAddress});
     }else{
-      const pathname=decodeURIComponent(url.pathname);const relative=pathname==='/'?'index.html':pathname.slice(1);
+      const pathname=decodeURIComponent(url.pathname);const relative=pathname==='/'?'index.html':pathname==='/admin'||pathname==='/admin/'?'login.html':pathname==='/admin/editor'||pathname==='/admin/editor/'?'editor.html':pathname.slice(1);
       if(!['index.html','editor.html','imprimir.html','login.html','sw.js','manifest.webmanifest'].includes(relative)&&!/^((js|css|img|fonts)\/|data\/inicial\.json$)/.test(relative))throw new Error('404');
       const staticRoot=production?path.join(root,'dist/client/'):root;const file=path.resolve(staticRoot,relative);if(!file.startsWith(staticRoot)||relative.split('/').includes('..'))throw new Error('404');
       response=new Response(await readFile(file),{headers:{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':production?(relative==='sw.js'?'no-cache':'public, max-age=0, must-revalidate'):'no-store','X-Content-Type-Options':'nosniff'}});

@@ -72,7 +72,7 @@ async function createSession(req,env,user,access,expiresIn,context){
 }
 export async function authRoute(req,env,context={}){
  const path=new URL(req.url).pathname;
- if(path==='/api/session'&&req.method==='GET'){const user=await resolveUser(req,env,context);return json({editor:!!user,editorId:user?.id||null,email:user?.email||null,local:!!context.local,configured:context.local||configured(env),signin:'login.html'});}
+ if(path==='/api/session'&&req.method==='GET'){const user=await resolveUser(req,env,context);return json({editor:!!user,editorId:user?.id||null,email:user?.email||null,local:!!context.local,configured:context.local||configured(env),signin:'/admin'});}
  if(!path.startsWith('/api/auth/'))return null;
  if(req.method!=='POST')return json({error:'Método no permitido.'},405);sameOrigin(req);
  if(path==='/api/auth/logout'){const token=sessionToken(req,context.local);if(token){await env.DB.prepare('DELETE FROM sesiones WHERE hash=?').bind(await hash(token)).run();await env.DB.prepare('DELETE FROM pendientes_mfa WHERE hash=?').bind(await hash(token)).run();}const r=json({ok:true});r.headers.set('Set-Cookie',sessionCookie('',context.local,0));return r;}
