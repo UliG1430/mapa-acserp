@@ -17,7 +17,9 @@ export function aplicarSnapshot(s,persistir=true){
   if(persistir&&!esPreview)try{localStorage.setItem(CACHE,JSON.stringify({...publicacion,datos:d}));}catch{}
   anunciar(true);
 }
-async function leer(url){const r=await fetch(url,{cache:'no-cache',signal:AbortSignal.timeout(8000)});if(!r.ok)throw new Error('No se pudo cargar la publicación.');return r.json();}
+// Las cabeceras del servidor deciden la frescura: version.json siempre se
+// revalida y cada revisión, por ser inmutable, sí puede reutilizar el CDN.
+async function leer(url){const r=await fetch(url,{signal:AbortSignal.timeout(8000)});if(!r.ok)throw new Error('No se pudo cargar la publicación.');return r.json();}
 export async function actualizarDatos(){
   if(busy||esPreview)return;busy=true;
   try{const v=await leer('public/version.json');if(v.revision!==publicacion.revision){const s=await leer(`public/revisions/${encodeURIComponent(v.revision)}.json`);if(s.revision!==v.revision)throw new Error('Revisión inconsistente.');aplicarSnapshot(s);}estadoConexion='actualizado';}
