@@ -2,6 +2,8 @@ import {HttpError,json,body,sameOrigin} from './http.js';
 const encoder=new TextEncoder();
 const ALLOW_DEFAULT='modeloonulp@gmail.com';
 const allowed=(email,env)=>(env.EDITOR_EMAILS||ALLOW_DEFAULT).split(',').map(s=>s.trim().toLowerCase()).filter(Boolean).includes(email?.toLowerCase());
+const supabaseUrl=env=>(env.SUPABASE_URL||'').match(/https:\/\/[a-z0-9-]+\.supabase\.co/i)?.[0]||'';
+const publishableKey=env=>(env.SUPABASE_PUBLISHABLE_KEY||'').match(/sb_publishable_[A-Za-z0-9_-]+/)?.[0]||'';
 const hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
 const fromHex=s=>Uint8Array.from(s.match(/../g)||[],c=>parseInt(c,16));
 export const hash=async value=>hex(new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(value))));
@@ -18,10 +20,10 @@ export async function rateLimit(db,bucket,limit,seconds){
  // Cada solicitud permitida limpia únicamente registros vencidos; tamaño acotado por límites de la plataforma.
  await db.prepare('DELETE FROM limites WHERE vence<?').bind(now).run();
 }
-function configured(env){return /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(env.SUPABASE_URL||'')&&!!env.SUPABASE_PUBLISHABLE_KEY&&/^[a-f0-9]{64}$/i.test(env.SESSION_ENCRYPTION_KEY||'');}
+function configured(env){return !!supabaseUrl(env)&&!!publishableKey(env)&&/^[a-f0-9]{64}$/i.test(env.SESSION_ENCRYPTION_KEY||'');}
 async function provider(env,path,method='GET',payload,token){
  if(!configured(env))throw new HttpError(503,'El inicio de sesión todavía no está conectado.');
- let r;try{r=await (env.AUTH_FETCH||fetch)(env.SUPABASE_URL+'/auth/v1/'+path,{method,headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:payload?JSON.stringify(payload):undefined,signal:AbortSignal.timeout(8000)});}catch{throw new HttpError(503,'No se pudo contactar al servicio de acceso. Intentá de nuevo.');}
+ let r;try{r=await (env.AUTH_FETCH||fetch)(supabaseUrl(env)+'/auth/v1/'+path,{method,headers:{apikey:publishableKey(env),'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:payload?JSON.stringify(payload):undefined,signal:AbortSignal.timeout(8000)});}catch{throw new HttpError(503,'No se pudo contactar al servicio de acceso. Intentá de nuevo.');}
  if(!r.ok){if(r.status===429)throw new HttpError(429,'Esperá un momento antes de solicitar otro acceso.');if(r.status>=500)throw new HttpError(503,'El servicio de acceso no está disponible.');throw new HttpError(401,'Correo o contraseña incorrectos, o acceso no autorizado.');}
  return r.status===204?null:r.json();
 }
