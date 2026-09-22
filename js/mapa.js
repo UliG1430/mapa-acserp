@@ -197,7 +197,22 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera, dat
     if(frame!==null)return;
     frame=requestAnimationFrame(()=>{frame=null;pintarTransformacion();});
   }
+
+  /**
+   * Marca que el mapa se esta moviendo. Mientras dure, el lienzo lleva
+   * will-change y el navegador lo transforma con la GPU sin redibujarlo, que es
+   * lo que hace fluido el gesto. Al quedarse quieto se lo saca: ahi el navegador
+   * vuelve a dibujar iconos y rotulos a la escala nueva, nitidos. Con
+   * will-change puesto siempre, esa segunda parte no pasaba nunca.
+   */
+  let quieto = null;
+  function marcarMovimiento() {
+    lienzo.classList.add('en-gesto');
+    clearTimeout(quieto);
+    quieto = setTimeout(() => lienzo.classList.remove('en-gesto'), 200);
+  }
   function pintarTransformacion() {
+    marcarMovimiento();
     if(!altaResolucion && z/zMin>2 && !navigator.connection?.saveData && raiz.dataset.fondo!=='oficial'){ fondo.src='img/mapa@2x.webp';altaResolucion=true; }
     lienzo.style.transform = `translate(${tx}px, ${ty}px) scale(${z})`;
     // Los marcadores viven dentro del lienzo, que ya esta escalado por z. Para que

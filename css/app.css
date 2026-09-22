@@ -304,8 +304,15 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
   position: absolute; top: 0; left: 0;
   width: 1254px; height: 1254px;
   transform-origin: 0 0;
-  will-change: transform;
 }
+/* will-change SOLO mientras el mapa se mueve, nunca fijo.
+   Fijo le dice al navegador "voy a seguir transformando esto, no lo redibujes":
+   dibuja el contenido una vez y despues estira ese mismo dibujo con la GPU. Como
+   los iconos y los rotulos viven adentro de este contenedor, al acercar no se
+   volvian a dibujar, se agrandaban, y se veian borrosos. Poniendolo solo durante
+   el gesto se conserva la fluidez y, al soltar, el navegador vuelve a dibujar
+   todo nitido a la escala nueva. Lo pone y lo saca mapa.js. */
+.mapa-lienzo.en-gesto { will-change: transform; }
 /* ---- calles reales de alrededor (OpenStreetMap) ---- */
 .mapa-entorno {
   position: absolute;
