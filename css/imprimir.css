@@ -148,10 +148,21 @@
       min-width: 0;
       display: grid;
       place-items: start center;
+      /* La hoja mide 297 mm de ancho. Aunque se muestre encogida con transform,
+         su caja de maquetado sigue midiendo eso, y en un telefono empujaba el
+         ancho de la pagina a mas de 1000 px: el panel quedaba apretado y la
+         vista previa terminaba con 57 px. Recortarla aca deja ver lo escalado,
+         que si entra. En papel se revierte, mas abajo. */
+      overflow: hidden;
     }
 
     .pi-escala {
-      transform-origin: top center;
+      /* Desde arriba a la izquierda, y con la caja midiendo lo que se ve: el
+         script le pone ancho y alto ya escalados. Con origen al centro y la
+         caja midiendo los 297 mm de la hoja, el navegador no podia centrar algo
+         mas ancho que su contenedor y terminaba empujando la hoja fuera de la
+         pantalla. */
+      transform-origin: top left;
     }
 
     /* ------------------------------------------------------------------- hoja */
@@ -480,6 +491,53 @@
     }
 
     /* ------------------------------------------------------------- impresion */
+    /* ------------------------------------------------------- pantallas angostas
+       Debajo de 860 px el panel de 268 px y la hoja no conviven: se apilan, con
+       la vista previa arriba para ver que se esta armando mientras se tocan las
+       opciones. Los checkboxes de organos pasan a dos columnas para que la
+       lista no sea un rollo de quince renglones. */
+    @media (max-width: 860px) {
+      .pi-cab {
+        padding: 9px 12px;
+        gap: 8px;
+      }
+
+      .pi-cab h1 {
+        font-size: 1.02rem;
+      }
+
+      .pi-cab .btn-pri {
+        flex: 1 1 100%;
+        order: 3;
+      }
+
+      .pi-cuerpo {
+        flex-direction: column;
+        padding: 12px;
+        gap: 12px;
+      }
+
+      .pi-panel {
+        position: static;
+        flex: 1 1 auto;
+        width: 100%;
+      }
+
+      .pi-lienzo {
+        width: 100%;
+        order: -1;
+      }
+
+      .pi-sub {
+        columns: 2;
+        column-gap: 14px;
+      }
+
+      .pi-sub .pi-op {
+        break-inside: avoid;
+      }
+    }
+
     @media print {
       @page {
         margin: 0;
@@ -504,11 +562,13 @@
 
       .pi-lienzo {
         display: block;
+        overflow: visible;
       }
 
       /* la escala es solo para el preview: en papel la hoja va a tamaño natural */
       .pi-escala {
         transform: none !important;
+        width: auto !important;
         height: auto !important;
       }
 
