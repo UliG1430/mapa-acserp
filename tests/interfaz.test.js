@@ -35,11 +35,11 @@ test('vista pública carga, pregunta el órgano, marca solo esa sede, limpia per
  assert.equal(doc.querySelector('#buscar-en-mapa'),null,'la búsqueda vive en su pestaña, no arriba del mapa');
  assert.equal(doc.querySelector('#btn-gps-apagar'),null,'un solo botón prende y apaga la ubicación');
  assert.match(doc.querySelector('.estado-publicacion').textContent,/Datos disponibles|Sin conexión|No se pudo comprobar/);
- assert.equal(doc.querySelectorAll('.op-organo small').length,15,'cada órgano con su nombre completo, chico');
+ assert.equal(doc.querySelectorAll('.op-organo small').length,15,'cada órgano con su nombre debajo de la sigla');assert.equal(doc.querySelector('.modal-ayuda'),null,'el cartel va sin descripción');assert.match([...doc.querySelectorAll('.op-organo small')].map(s=>s.textContent).join('|'),/Oficina para el Desarme/);
  doc.querySelector('[data-vista="buscar"]').click();assert.equal(doc.querySelector('#vista-buscar').hidden,false);
  doc.querySelector('#btn-perfil').click();doc.querySelector('[data-sigla="AG"]').click();const form=doc.querySelector('#form-perfil');form.dispatchEvent(new win.SubmitEvent('submit',{cancelable:true,submitter:doc.querySelector('button[value="guardar"]')}));assert.match(doc.querySelector('#btn-perfil').textContent,/AG/);
  assert.equal(doc.querySelectorAll('.marca-sede:not([hidden])').length,1);assert.equal(doc.querySelector('.filtro[data-g="sede"]').textContent,'Mi órgano');
- doc.querySelector('#btn-perfil').click();form.dispatchEvent(new win.SubmitEvent('submit',{cancelable:true,submitter:doc.querySelector('button[value="omitir"]')}));assert.match(doc.querySelector('#btn-perfil').textContent,/Tu órgano/);
+ doc.querySelector('#btn-perfil').click();form.dispatchEvent(new win.SubmitEvent('submit',{cancelable:true,submitter:doc.querySelector('button[value="omitir"]')}));assert.match(doc.querySelector('#btn-perfil').textContent,/Elegí tu órgano/);
  assert.equal(doc.querySelectorAll('.marca-sede:not([hidden])').length,15);assert.equal(doc.querySelector('.filtro[data-g="sede"]').textContent,'Órganos');
  doc.querySelector('[data-vista="mapa"]').click();doc.querySelector('.filtro[data-g="sanitario"]').click();doc.querySelector('[data-vista="buscar"]').click();const q=doc.querySelector('#q');q.value='baño';q.dispatchEvent(new win.Event('input'));doc.querySelector('#resultados button').click();await wait(100);assert.equal(doc.querySelector('.marca-activa').hidden,false);
  win.location.hash='info';win.dispatchEvent(new win.HashChangeEvent('hashchange'));assert.equal(doc.querySelector('#vista-info').hidden,false);

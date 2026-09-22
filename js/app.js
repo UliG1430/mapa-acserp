@@ -1,6 +1,6 @@
 import {logoOrgano,colorOrgano} from './organos.js';
 import {alCambiarDatos, obtenerDatos, publicacion} from './datos.js';
-import {prepararOffline} from './estado-publico.js';
+import './estado-publico.js';
 // ============================================================================
 //  app.js — arma la interfaz y conecta mapa, cronograma, buscador y perfil.
 // ============================================================================
@@ -18,6 +18,8 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// el arroba ya lo pone el contexto (es un enlace a Instagram): escrito se lee peor
+const sinArroba = (s) => String(s == null ? '' : s).replace(/^@/, '');
 
 let mapa = null;
 let pararGps = null;
@@ -406,7 +408,7 @@ function pintarCronograma() {
 
   const intro = o
     ? `<p class="lista-grupo">Cronograma de ${esc(o.sigla)} · ${esc(cron.nombreTrack(o.track))}</p>`
-    : '<p class="lista-grupo">Elegí tu órgano arriba para ver solo lo tuyo</p>';
+    : '<p class="lista-grupo lista-grupo-invita">Elegí tu órgano arriba para ver solo lo tuyo</p>';
   const consulta=organoConsulta?'<button type="button" class="btn-sec" id="volver-mi-cronograma">Volver a mi cronograma</button>':'';
 
   $('#bloques').innerHTML = intro + consulta + bloques.map((b) => {
@@ -630,10 +632,6 @@ function pintarInfo() {
       <h2>Guardala en tu celular</h2>
       <p>Desde el menú del navegador elegí <b>“Agregar a pantalla de inicio”</b> (en iPhone está dentro del botón de compartir).
       Así se abre como una app y sigue funcionando aunque te quedes sin señal en el predio.</p>
-      <div class="ficha-acciones">
-        <button type="button" class="btn-sec" id="preparar-offline">Descargar para usar sin conexión</button>
-      </div>
-      <p class="nota-resultado" id="offline-resultado" role="status"></p>
     </div>
     <div class="tarjeta">
       <h2>Sobre la ubicación</h2>
@@ -644,7 +642,7 @@ function pintarInfo() {
   partes.push(`<p class="firma">
       Diseñado y desarrollado por
       <a href="${esc(CREDITOS.instagram)}" target="_blank" rel="noopener noreferrer">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.9.07 1.2.05 1.8.25 2.2.42.6.22 1 .48 1.4.9.43.42.7.83.92 1.4.17.42.37 1.05.42 2.24.06 1.28.07 1.66.07 4.88s0 3.6-.07 4.88c-.05 1.19-.25 1.82-.42 2.24-.22.57-.49.98-.91 1.4-.42.42-.83.69-1.4.91-.42.17-1.05.37-2.24.42-1.28.06-1.66.07-4.88.07s-3.6 0-4.88-.07c-1.19-.05-1.82-.25-2.24-.42a3.8 3.8 0 0 1-1.4-.91 3.8 3.8 0 0 1-.91-1.4c-.17-.42-.37-1.05-.42-2.24C2.2 15.6 2.2 15.22 2.2 12s0-3.6.07-4.88c.05-1.19.25-1.82.42-2.24.22-.57.49-.98.91-1.4.42-.42.83-.69 1.4-.91.42-.17 1.05-.37 2.24-.42C8.4 2.2 8.8 2.2 12 2.2Zm0 1.8c-3.16 0-3.5 0-4.74.07-.9.04-1.38.19-1.7.31-.43.17-.73.37-1.05.69-.32.32-.52.62-.69 1.05-.12.32-.27.8-.31 1.7C3.44 8.5 3.43 8.84 3.43 12s0 3.5.08 4.74c.4.9.19 1.38.31 1.7.17.43.37.73.69 1.05.32.32.62.52 1.05.69.32.12.8.27 1.7.31 1.24.06 1.58.07 4.74.07s3.5 0 4.74-.07c.9-.04 1.38-.19 1.7-.31.43-.17.73-.37 1.05-.69.32-.32.52-.62.69-1.05.12-.32.27-.8.31-1.7.06-1.24.07-1.58.07-4.74s0-3.5-.07-4.74c-.04-.9-.19-1.38-.31-1.7a2.8 2.8 0 0 0-.69-1.05 2.8 2.8 0 0 0-1.05-.69c-.32-.12-.8-.27-1.7-.31C15.5 4 15.16 4 12 4Zm0 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 1.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4Zm5.2-3.1a1.17 1.17 0 1 1 0 2.34 1.17 1.17 0 0 1 0-2.34Z"/></svg><span>${esc(CREDITOS.usuario)}</span></a>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.9.07 1.2.05 1.8.25 2.2.42.6.22 1 .48 1.4.9.43.42.7.83.92 1.4.17.42.37 1.05.42 2.24.06 1.28.07 1.66.07 4.88s0 3.6-.07 4.88c-.05 1.19-.25 1.82-.42 2.24-.22.57-.49.98-.91 1.4-.42.42-.83.69-1.4.91-.42.17-1.05.37-2.24.42-1.28.06-1.66.07-4.88.07s-3.6 0-4.88-.07c-1.19-.05-1.82-.25-2.24-.42a3.8 3.8 0 0 1-1.4-.91 3.8 3.8 0 0 1-.91-1.4c-.17-.42-.37-1.05-.42-2.24C2.2 15.6 2.2 15.22 2.2 12s0-3.6.07-4.88c.05-1.19.25-1.82.42-2.24.22-.57.49-.98.91-1.4.42-.42.83-.69 1.4-.91.42-.17 1.05-.37 2.24-.42C8.4 2.2 8.8 2.2 12 2.2Zm0 1.8c-3.16 0-3.5 0-4.74.07-.9.04-1.38.19-1.7.31-.43.17-.73.37-1.05.69-.32.32-.52.62-.69 1.05-.12.32-.27.8-.31 1.7C3.44 8.5 3.43 8.84 3.43 12s0 3.5.08 4.74c.4.9.19 1.38.31 1.7.17.43.37.73.69 1.05.32.32.62.52 1.05.69.32.12.8.27 1.7.31 1.24.06 1.58.07 4.74.07s3.5 0 4.74-.07c.9-.04 1.38-.19 1.7-.31.43-.17.73-.37 1.05-.69.32-.32.52-.62.69-1.05.12-.32.27-.8.31-1.7.06-1.24.07-1.58.07-4.74s0-3.5-.07-4.74c-.04-.9-.19-1.38-.31-1.7a2.8 2.8 0 0 0-.69-1.05 2.8 2.8 0 0 0-1.05-.69c-.32-.12-.8-.27-1.7-.31C15.5 4 15.16 4 12 4Zm0 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 1.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4Zm5.2-3.1a1.17 1.17 0 1 1 0 2.34 1.17 1.17 0 0 1 0-2.34Z"/></svg><span>${esc(sinArroba(CREDITOS.usuario))}</span></a>
       para <b>${esc(CREDITOS.para)}</b>
       <small>${esc(CREDITOS.organizacion)}.<br>
       Ilustración del predio: República de los Niños. Calles: © colaboradores de OpenStreetMap.</small>
@@ -652,19 +650,6 @@ function pintarInfo() {
 
   $('#info-contenido').innerHTML = partes.join('');
 
-  $('#preparar-offline').onclick = async (e) => {
-    const b = e.currentTarget;
-    b.disabled = true;
-    $('#offline-resultado').textContent = 'Descargando el mapa…';
-    try {
-      await prepararOffline();
-      $('#offline-resultado').textContent = 'Listo. El mapa está disponible sin conexión.';
-    } catch (err) {
-      $('#offline-resultado').textContent = err.message;
-    } finally {
-      b.disabled = false;
-    }
-  };
   $$('#info-contenido [data-tema]').forEach((b) => {
     b.onclick = () => setTema(b.dataset.tema);
   });
@@ -688,23 +673,28 @@ function pintarInfo() {
 // ===========================================================================
 let elegido = { organo: null };
 
+/**
+ * El nombre como entra en la grilla del cartel. Saca "de la ONU", que en una
+ * lista de organos de la ONU no distingue a ninguno, y abrevia "Organización"
+ * solo cuando el nombre igual sigue siendo largo. El nombre completo queda en
+ * la etiqueta accesible y en la ficha del mapa.
+ */
+function nombreCorto(nombre) {
+  const corto = String(nombre).replace(/\s+de la ONU\b/g, '');
+  return corto.length > 40 ? corto.replace(/^Organización\b/, 'Org.') : corto;
+}
+
 function abrirPerfil() {
   const modal = $('#modal-perfil');
   modal.returnValue = '';
   elegido = { ...obtenerPerfil() };
-  const actual = miOrgano();
-  $('#modal-perfil-ayuda').innerHTML = actual
-    ? `Ahora estás viendo lo de <b>${esc(actual.sigla)}</b>, y el mapa marca solo su sede.
-       Tocá otro órgano para cambiarlo, o <b>Ver todo</b> para quedarte sin órgano y ver
-       el modelo completo.`
-    : `Sirve para marcar sólo tu sede en el mapa y filtrar el cronograma.
-       Podés seguir sin elegir nada y ver todo completo; se cambia cuando quieras.`;
+  // Logo chico con la sigla al lado y el nombre debajo: asi las cinco filas y
+  // los dos botones entran en una pantalla, sin scrollear.
   $('#grilla-organos').innerHTML = ORGANOS.map((o) => `
     <button type="button" class="op-organo" data-sigla="${esc(o.sigla)}"
       aria-pressed="${elegido.organo === o.sigla}" aria-label="${esc(o.sigla)}, ${esc(o.nombre)}">
-      ${logoOrgano(o.sigla)}
-      ${esc(o.sigla)}
-      <small>${esc(o.nombre)}</small>
+      <span class="op-cab">${logoOrgano(o.sigla)}<b>${esc(o.sigla)}</b></span>
+      <small>${esc(nombreCorto(o.nombre))}</small>
     </button>`).join('');
   // abrirlo dos veces tira error: pasa si se toca el chip con el cartel ya abierto
   if (!modal.open) modal.showModal();
@@ -740,7 +730,7 @@ function pintarChip() {
                     <span>${esc(o.sigla)}</span>`;
     el.setAttribute('aria-label', `Tu órgano: ${o.sigla}. Tocá para cambiarlo.`);
   } else {
-    el.innerHTML = '<span>Tu órgano</span>';
+    el.innerHTML = '<span>Elegí tu órgano</span>';
     el.setAttribute('aria-label', 'Elegir tu órgano');
   }
 }
