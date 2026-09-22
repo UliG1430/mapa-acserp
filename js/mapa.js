@@ -164,6 +164,7 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera, dat
   // ----------------------------------------------------------------- estado
   let z = 1, tx = 0, ty = 0, zMin = 0.5, zMax = 4, zPiso = 0.2;
   let filtros = new Set(GRUPOS.map((g) => g.id));
+  let soloOrgano = null;   // sigla en minusculas: se marca esa sede y ninguna otra
   let seleccion = null;
   let ubic = null;
   let escalaPantalla = 1;
@@ -560,9 +561,16 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera, dat
   function aplicarFiltros() {
     const permitidos = new Set();
     GRUPOS.forEach((g) => { if (filtros.has(g.id)) g.tipos.forEach((t) => permitidos.add(t)); });
-    nodos.forEach((nodo) => {
-      nodo.hidden = !permitidos.has(nodo.dataset.tipo) && nodo.dataset.id !== seleccion;
-      nodo.classList.toggle('marca-filtrada', filtros.size < GRUPOS.length && permitidos.has(nodo.dataset.tipo));
+    nodos.forEach((nodo, id) => {
+      let ver = permitidos.has(nodo.dataset.tipo);
+      // Con un organo elegido el mapa marca esa sede y ninguna otra. Quince
+      // discos con logo tapaban el dibujo del predio y ninguno era el que la
+      // persona venia a buscar. Se vuelve a verlos todos con "Ver todo".
+      if (ver && soloOrgano && nodo.dataset.tipo === 'sede' && id !== 'org-' + soloOrgano) ver = false;
+      // el punto abierto se ve siempre, aunque este filtrado: se llego a el
+      // desde el buscador o desde la lista, y esconderlo seria no contestar
+      nodo.hidden = !ver && id !== seleccion;
+      nodo.classList.toggle('marca-filtrada', filtros.size < GRUPOS.length && ver);
     });
     actualizarRoving();
   }
@@ -670,6 +678,11 @@ export function crearMapa(raiz, { alSeleccionar, alTocarMapa, alQuedarFuera, dat
     },
     seleccionActual: () => seleccion,
     setFiltros(nuevos) { filtros = new Set(nuevos); aplicarFiltros(); },
+    /** Sigla del organo propio, o null para volver a marcarlos a todos. */
+    setSoloOrgano(sigla) {
+      soloOrgano = sigla ? String(sigla).toLowerCase() : null;
+      aplicarFiltros();
+    },
     setFondo(cual) {
       fondo.src = cual === 'oficial' ? 'img/oficial.webp' : (altaResolucion ? 'img/mapa@2x.webp' : 'img/mapa.webp');
       raiz.dataset.fondo = cual;

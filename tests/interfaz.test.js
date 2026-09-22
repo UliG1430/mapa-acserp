@@ -26,13 +26,24 @@ async function render(page,env){
  return{win,doc:win.document,async close(){await win.happyDOM.abort();win.close();}};
 }
 function closeDialog(w,value='ok'){const d=w.document.querySelector('#ed-dialog');d.returnValue=value;d.open=false;d.dispatchEvent(new w.Event('close'));}
-test('vista pública carga, navega, limpia perfil y revela destino filtrado',async()=>{const DB=abrirDB(':memory:');let app;try{
- app=await render('index.html',{DB,LOCAL_USER:'test'});const{win,doc}=app;assert.equal(doc.querySelectorAll('.marca').length,78);assert.equal(doc.querySelector('#modal-perfil').open,false);
- doc.querySelector('#buscar-en-mapa').click();assert.equal(doc.querySelector('#vista-buscar').hidden,false);
- doc.querySelector('#btn-perfil').click();doc.querySelector('[data-sigla="AG"]').click();const profile=doc.querySelector('#modal-perfil'),form=doc.querySelector('#form-perfil');form.dispatchEvent(new win.SubmitEvent('submit',{cancelable:true,submitter:doc.querySelector('button[value="guardar"]')}));assert.match(doc.querySelector('#btn-perfil').textContent,/AG/);
- doc.querySelector('#btn-perfil').click();form.dispatchEvent(new win.SubmitEvent('submit',{cancelable:true,submitter:doc.querySelector('button[value="omitir"]')}));assert.match(doc.querySelector('#btn-perfil').textContent,/Elegí/);
- doc.querySelector('[data-vista="mapa"]').click();doc.querySelector('.filtro[data-g="sanitario"]').click();doc.querySelector('#buscar-en-mapa').click();const q=doc.querySelector('#q');q.value='baño';q.dispatchEvent(new win.Event('input'));doc.querySelector('#resultados button').click();await wait(100);assert.equal(doc.querySelector('.marca-activa').hidden,false);
+// Sin scripts (render los quita), portada.js no corre: la app tiene que sacar la
+// portada por su cuenta y abrir el cartel igual. Es el mismo caso que en un
+// navegador donde ese archivo no llegara a bajar.
+test('vista pública carga, pregunta el órgano, marca solo esa sede, limpia perfil y revela destino filtrado',async()=>{const DB=abrirDB(':memory:');let app;try{
+ app=await render('index.html',{DB,LOCAL_USER:'test'});const{win,doc}=app;assert.equal(doc.querySelectorAll('.marca').length,78);
+ await until(()=>doc.querySelector('#modal-perfil').open);assert.equal(doc.querySelector('#portada').hidden,true);
+ assert.equal(doc.querySelector('#buscar-en-mapa'),null,'la búsqueda vive en su pestaña, no arriba del mapa');
+ assert.equal(doc.querySelector('#btn-gps-apagar'),null,'un solo botón prende y apaga la ubicación');
+ assert.match(doc.querySelector('.estado-publicacion').textContent,/Datos disponibles|Sin conexión|No se pudo comprobar/);
+ assert.equal(doc.querySelectorAll('.op-organo small').length,15,'cada órgano con su nombre completo, chico');
+ doc.querySelector('[data-vista="buscar"]').click();assert.equal(doc.querySelector('#vista-buscar').hidden,false);
+ doc.querySelector('#btn-perfil').click();doc.querySelector('[data-sigla="AG"]').click();const form=doc.querySelector('#form-perfil');form.dispatchEvent(new win.SubmitEvent('submit',{cancelable:true,submitter:doc.querySelector('button[value="guardar"]')}));assert.match(doc.querySelector('#btn-perfil').textContent,/AG/);
+ assert.equal(doc.querySelectorAll('.marca-sede:not([hidden])').length,1);assert.equal(doc.querySelector('.filtro[data-g="sede"]').textContent,'Mi órgano');
+ doc.querySelector('#btn-perfil').click();form.dispatchEvent(new win.SubmitEvent('submit',{cancelable:true,submitter:doc.querySelector('button[value="omitir"]')}));assert.match(doc.querySelector('#btn-perfil').textContent,/Tu órgano/);
+ assert.equal(doc.querySelectorAll('.marca-sede:not([hidden])').length,15);assert.equal(doc.querySelector('.filtro[data-g="sede"]').textContent,'Órganos');
+ doc.querySelector('[data-vista="mapa"]').click();doc.querySelector('.filtro[data-g="sanitario"]').click();doc.querySelector('[data-vista="buscar"]').click();const q=doc.querySelector('#q');q.value='baño';q.dispatchEvent(new win.Event('input'));doc.querySelector('#resultados button').click();await wait(100);assert.equal(doc.querySelector('.marca-activa').hidden,false);
  win.location.hash='info';win.dispatchEvent(new win.HashChangeEvent('hashchange'));assert.equal(doc.querySelector('#vista-info').hidden,false);
+ doc.querySelector('.segmentos [data-tema="oscuro"]').click();assert.equal(doc.documentElement.dataset.tema,'oscuro');assert.equal(doc.querySelector('.segmentos [aria-pressed="true"]').dataset.tema,'oscuro');
  }finally{await app?.close();DB.close();}});
 test('editor guarda, deshace, publica y otro cliente recibe mapa/buscador actualizado',async()=>{const DB=abrirDB(':memory:');let ed,pub;try{
  const env={DB,LOCAL_USER:'test'};ed=await render('editor.html',env);pub=await render('index.html',env);const{win,doc}=ed;

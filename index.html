@@ -14,12 +14,30 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="MINULP 2026">
   <link rel="preload" href="fonts/montserrat-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <!-- as="fetch" y no as="image" a proposito: portada.js la pide con fetch(), y
+     asi el navegador reusa esta misma descarga en vez de bajarla dos veces -->
+  <link rel="preload" href="img/splash.webp" as="fetch" crossorigin="anonymous">
+  <!-- El tema se decide ANTES de pintar nada, por eso este script no lleva
+     defer. Va en un archivo y no en linea: la politica de seguridad del
+     servidor (script-src 'self') no deja correr scripts en linea. -->
+  <script src="js/tema-inicial.js"></script>
   <link rel="stylesheet" href="css/fuente.css">
   <link rel="stylesheet" href="css/marcas.css">
   <link rel="stylesheet" href="css/app.css">
 </head>
 
 <body>
+
+  <div id="portada" role="status" aria-label="Cargando MINULP 2026">
+    <div class="portada-caja">
+      <!-- el src lo pone portada.js: ver por que en su comentario -->
+      <img id="portada-anim" alt="" width="224" height="224" decoding="async">
+      <p class="portada-txt">MINULP 2026</p>
+      <p class="portada-estado" aria-live="polite"></p>
+    </div>
+  </div>
+  <!-- La portada se maneja sola, sin esperar a la app: ver js/portada.js -->
+  <script src="js/portada.js" defer></script>
 
   <a class="saltar" href="#contenido">Saltar al contenido</a>
 
@@ -29,10 +47,10 @@
     </button>
     <div class="cabecera-txt">
       <p class="cabecera-titulo">MINULP 2026</p>
-      <p class="cabecera-sub">República de los Niños · 22 al 25 de septiembre</p>
+      <p class="cabecera-sub">Del 22 al 25 de septiembre</p>
     </div>
     <button type="button" class="chip-perfil" id="btn-perfil" aria-label="Elegir tu órgano">
-      <span id="chip-perfil-txt">Elegí tu órgano</span>
+      <span id="chip-perfil-txt">Tu órgano</span>
     </button>
   </header>
 
@@ -41,15 +59,6 @@
 
     <!-- ================================================================ MAPA -->
     <section class="vista" id="vista-mapa" aria-label="Mapa del predio">
-      <div class="mapa-busqueda">
-        <button type="button" id="buscar-en-mapa" class="buscar-mapa">Buscar órgano, baño o lugar… <span aria-hidden="true">⌕</span></button>
-        <div class="accesos-rapidos" aria-label="Destinos frecuentes">
-          <button type="button" id="mi-sede">Mi sede</button>
-          <button type="button" data-busqueda="baño">Baños</button>
-          <button type="button" data-busqueda="comer">Comida</button>
-          <button type="button" data-busqueda="salud">Ayuda</button>
-        </div>
-      </div>
       <div class="barra-filtros" role="group" aria-label="Qué mostrar en el mapa">
         <div class="filtros" id="filtros"></div>
         <div class="conmutador" role="group" aria-label="Forma de ver los lugares">
@@ -73,7 +82,6 @@
         </div>
 
         <div class="mapa-controles">
-          <button type="button" id="btn-gps-apagar" class="ctrl" hidden aria-label="Desactivar ubicación">GPS ×</button>
           <button type="button" id="btn-ubicar" class="ctrl ctrl-ubicar" aria-label="Mostrar dónde estoy">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -95,7 +103,7 @@
           </button>
         </div>
 
-        <p class="credito">Calles © <span>OpenStreetMap</span> · Ilustración del predio: República de los Niños</p>
+        <p class="credito">Calles © <span>OpenStreetMap</span> · República de los Niños</p>
         <p class="aviso-gps" id="aviso-gps" hidden></p>
         <div class="ficha" id="ficha" hidden></div>
       </div>
@@ -161,7 +169,7 @@
   <dialog class="modal" id="modal-perfil" aria-labelledby="modal-perfil-titulo">
     <form method="dialog" class="modal-caja" id="form-perfil">
       <h2 id="modal-perfil-titulo">¿De qué órgano sos?</h2>
-      <p class="modal-ayuda" id="modal-perfil-ayuda">Sirve para mostrarte tu sede en el mapa y
+      <p class="modal-ayuda" id="modal-perfil-ayuda">Sirve para marcar sólo tu sede en el mapa y
         filtrar el cronograma. Podés seguir sin elegir nada y ver todo completo; se cambia cuando quieras.</p>
 
       <fieldset>

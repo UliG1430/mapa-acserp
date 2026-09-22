@@ -35,38 +35,52 @@
   --e-senda: #b3b2a0;
   --e-riel: #a5a598;
   --e-texto: #5d6051;
+  /* piezas que cambian con el tema y no son un color plano */
+  --filtro-dibujo: none;
+  --contorno-marca: var(--navy);
+  --realce: var(--navy);
   --tipo: 'Montserrat', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --tinta: #eef0f6;
-    --tinta-2: #a8aec2;
-    --papel: #14162a;
-    --papel-2: #1b1e34;
-    --papel-3: #262a44;
-    --borde: #343a5c;
-    --acento: #6ab7f0;
-    --alerta: #ff8095;
-    --ok: #5bd39a;
-    --sombra: 0 2px 6px rgba(0, 0, 0, .4), 0 10px 28px rgba(0, 0, 0, .35);
-    --sombra-baja: 0 1px 3px rgba(0, 0, 0, .5);
+/* ---------------------------------------------------------------- tema oscuro
+   La paleta oscura vive UNA sola vez, colgada de un atributo. El <html> siempre
+   lleva data-tema="claro" u "oscuro": lo escribe js/tema-inicial.js antes de
+   que se pinte nada, leyendo lo que la persona eligio en Info > Apariencia o,
+   si nunca eligio, el modo del sistema. Con un @media no habria forma de pedir
+   un tema distinto al del telefono. */
+:root[data-tema="oscuro"] {
+  color-scheme: dark;
+  --tinta: #eef0f6;
+  --tinta-2: #a8aec2;
+  --papel: #14162a;
+  --papel-2: #1b1e34;
+  --papel-3: #262a44;
+  --borde: #343a5c;
+  --acento: #6ab7f0;
+  --alerta: #ff8095;
+  --ok: #5bd39a;
+  --sombra: 0 2px 6px rgba(0, 0, 0, .4), 0 10px 28px rgba(0, 0, 0, .35);
+  --sombra-baja: 0 1px 3px rgba(0, 0, 0, .5);
 
-    --e-fondo: #1e2233;
-    --e-verde: #26303a;
-    --e-bosque: #2a3639;
-    --e-cancha: #27333a;
-    --e-agua: #24384f;
-    --e-via: #39415a;
-    --e-via-1: #4d5372;
-    --e-via-2: #434a66;
-    --e-borde-via: #2a3145;
-    --e-senda: #3a4158;
-    --e-riel: #3d445c;
-    --e-texto: #8f97b5;
-  }
-  /* el dibujo es siempre claro: lo bajamos un toque para que no encandile */
-  .mapa-fondo { filter: brightness(.86) saturate(.92); }
+  --e-fondo: #1e2233;
+  --e-verde: #26303a;
+  --e-bosque: #2a3639;
+  --e-cancha: #27333a;
+  --e-agua: #24384f;
+  --e-via: #39415a;
+  --e-via-1: #4d5372;
+  --e-via-2: #434a66;
+  --e-borde-via: #2a3145;
+  --e-senda: #3a4158;
+  --e-riel: #3d445c;
+  --e-texto: #8f97b5;
+
+  /* el dibujo del predio es siempre claro: lo bajamos un toque para que no
+     encandile, y el navy deja de contrastar sobre fondo oscuro */
+  --filtro-dibujo: brightness(.86) saturate(.92);
+  --contorno-marca: #fff;
+  --realce: var(--acento);
 }
 
 * { box-sizing: border-box; }
@@ -135,9 +149,19 @@ button, input { font: inherit; color: inherit; }
   animation: portadaEntra .5s .35s both ease-out;
 }
 @keyframes portadaEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: .85; } }
+/* Si el logo ya se dibujo y la app todavia no esta, se dice. Una portada muda
+   que se queda quieta parece colgada aunque este cargando. El texto ocupa su
+   lugar desde el principio para que el logo no salte cuando aparece. */
+.portada-estado {
+  margin: 2px 0 0; min-height: 1.3em;
+  color: #aeb4e8; font-size: .76rem; font-weight: 500; letter-spacing: .02em;
+  opacity: 0; transition: opacity .35s ease;
+}
+.portada-estado.visible { opacity: .92; animation: portadaPulso 1.8s .35s ease-in-out infinite; }
+@keyframes portadaPulso { 50% { opacity: .5; } }
 @media (prefers-reduced-motion: reduce) {
   #portada { transition: none; }
-  .portada-txt { animation: none; }
+  .portada-txt, .portada-estado.visible { animation: none; }
 }
 
 /* --------------------------------------------------------------- cabecera */
@@ -164,10 +188,23 @@ button, input { font: inherit; color: inherit; }
 .cabecera-inicio:active { background: rgba(255, 255, 255, .14); }
 .cabecera-logo { width: 34px; height: 34px; flex: 0 0 auto; display: block; }
 .cabecera-txt { min-width: 0; flex: 1; }
-.cabecera-titulo { margin: 0; font-weight: 700; font-size: 1.02rem; letter-spacing: .02em; }
+.cabecera-titulo {
+  margin: 0; font-weight: 700; font-size: 1.02rem; letter-spacing: .02em;
+  /* en 320 px de ancho el titulo se partia en dos lineas y desbordaba la barra */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .cabecera-sub {
   margin: 0; font-size: .72rem; color: #b9bde0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* La barra tiene tres cosas y ninguna mas: volver al mapa, saber donde estas y
+   tu organo. El tema se elige en Info > Apariencia. En un telefono muy angosto
+   (los 320 px de un SE viejo) manda el titulo: la fecha tambien esta en el
+   cronograma, el nombre de la app no esta en ningun otro lado. */
+@media (max-width: 359px) {
+  .cabecera { padding: 0 8px; gap: 6px; }
+  .cabecera-titulo { font-size: .92rem; }
+  .cabecera-sub { display: none; }
 }
 
 .chip-perfil {
@@ -222,8 +259,21 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
   cursor: pointer;
   display: flex; align-items: center;
 }
+/* Prendido, pero sin gritar. El navy lleno era casi negro y, con tres o cuatro
+   filtros encendidos, la barra quedaba mas pesada que el mapa que esta arriba
+   de todo esto. Un tinte celeste con el texto en el color fuerte alcanza para
+   que se lea cual esta activo. El tinte sale del acento y no del navy: el navy
+   es tan oscuro que al 15%% da gris, y ahi la unica diferencia con un filtro
+   apagado quedaba en el color del texto. */
 .filtro[aria-pressed="true"] {
-  background: var(--navy); border-color: var(--navy); color: #fff;
+  background: color-mix(in srgb, var(--acento) 15%, var(--papel));
+  border-color: color-mix(in srgb, var(--acento) 45%, var(--papel));
+  color: var(--realce);
+}
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .filtro[aria-pressed="true"] {
+    background: var(--papel-3); border-color: var(--realce); color: var(--realce);
+  }
 }
 
 .conmutador {
@@ -288,6 +338,7 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
 
 /* el dibujo se apoya sobre el mapa real como una lamina */
 .mapa-fondo {
+  filter: var(--filtro-dibujo);
   box-shadow: 0 0 0 1px rgba(20, 30, 15, .22), 0 6px 26px rgba(20, 30, 15, .22);
   position: absolute; inset: 0;
   width: 100%; height: 100%;
@@ -348,12 +399,9 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
 
 .marca-activa { z-index: 5; }
 .marca-activa .marca-disco {
-  outline: 3px solid var(--navy);
+  outline: 3px solid var(--contorno-marca);
   outline-offset: 2px;
   transform: scale(1.18);
-}
-@media (prefers-color-scheme: dark) {
-  .marca-activa .marca-disco { outline-color: #fff; }
 }
 
 /* ----------------------------------------------------------------- ubicacion */
@@ -650,10 +698,7 @@ a.btn-pri, a.btn-sec { text-decoration: none; display: grid; place-items: center
 .bloque-col b { color: var(--tinta); font-weight: 600; }
 .bloque-pausa { background: var(--papel-3); }
 .bloque-acto, .bloque-social { border-color: var(--navy); }
-.bloque-acto .bloque-titulo, .bloque-social .bloque-titulo { color: var(--navy); }
-@media (prefers-color-scheme: dark) {
-  .bloque-acto .bloque-titulo, .bloque-social .bloque-titulo { color: var(--acento); }
-}
+.bloque-acto .bloque-titulo, .bloque-social .bloque-titulo { color: var(--realce); }
 .bloque-ahora { border-color: var(--ok); border-width: 2px; background: var(--papel); }
 .bloque-ahora .bloque-hora::before {
   content: "ahora"; display: block; font-size: .6rem; text-transform: uppercase;
@@ -751,8 +796,7 @@ a.btn-pri, a.btn-sec { text-decoration: none; display: grid; place-items: center
   padding: 6px 2px;
 }
 .tabbar svg { width: 23px; height: 23px; fill: currentColor; }
-.tabbar button.activo { color: var(--navy); }
-@media (prefers-color-scheme: dark) { .tabbar button.activo { color: var(--acento); } }
+.tabbar button.activo { color: var(--realce); }
 .tabbar button.activo svg { transform: scale(1.06); }
 
 /* ------------------------------------------------------------------- modal */
@@ -771,15 +815,23 @@ a.btn-pri, a.btn-sec { text-decoration: none; display: grid; place-items: center
   text-transform: uppercase; letter-spacing: .06em; color: var(--tinta-2);
   margin-bottom: 8px;
 }
-.grilla-organos { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 6px; }
+/* Tres columnas: las cinco filas entran con los botones a la vista, sin tener
+   que scrollear para llegar a "Listo". El nombre completo va abajo, chico y
+   recortado a dos lineas, para que todas las celdas midan lo mismo. */
+.grilla-organos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .op-organo {
-  min-height: 76px; padding: 8px 4px 6px;
+  min-height: 76px; padding: 8px 5px 7px;
   border: 1px solid var(--borde); border-radius: 12px;
   background: var(--papel-2); cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  font-size: .74rem; font-weight: 700;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-size: .78rem; font-weight: 700; text-align: center;
 }
 .op-organo img { width: 34px; height: 34px; border-radius: 50%; }
+.op-organo small {
+  font-size: .6rem; font-weight: 500; line-height: 1.15; color: var(--tinta-2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .op-organo[aria-pressed="true"] { border-color: var(--navy); border-width: 2px; background: var(--papel); }
 .modal-pie { display: flex; gap: 8px; margin-top: 4px; }
 
@@ -798,29 +850,79 @@ a.btn-pri, a.btn-sec { text-decoration: none; display: grid; place-items: center
   }
 }
 
-/* Superficies de consulta: mapa primero, controles legibles, estado persistente. */
-.estado-publicacion{flex:0 0 auto;padding:5px 16px;background:var(--papel-2);border-bottom:1px solid var(--borde);font-size:.78rem;color:var(--tinta-2);}
-.estado-publicacion[data-estado="offline"],.estado-publicacion[data-estado="sin-actualizar"]{color:var(--alerta)}
-.estado-publicacion[data-estado="preview"]{background:#3b1d5e;color:#fff;font-weight:600}
-.mapa-busqueda{padding:10px 12px 4px;background:var(--papel);display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-.buscar-mapa{flex:1;min-width:220px;min-height:46px;padding:10px 14px;border:1px solid var(--borde);border-radius:12px;background:var(--papel-2);text-align:left;font-size:.9rem;color:var(--tinta-2);cursor:pointer;display:flex;justify-content:space-between;}
-.accesos-rapidos{display:flex;gap:6px;overflow:auto;}
-.accesos-rapidos button{border:1px solid var(--borde);background:var(--papel);border-radius:10px;min-height:44px;padding:8px 12px;font-size:.875rem;font-weight:600;white-space:nowrap;cursor:pointer;}
-.accesos-rapidos button:first-child{background:var(--navy);color:white;border-color:var(--navy)}
-.filtro,.conmutador button{min-height:44px;font-size:.875rem}
-.tabbar button{font-size:.875rem}
-.fila-sub,.modal-ayuda{font-size:.875rem}
-.grilla-organos{grid-template-columns:repeat(2,minmax(0,1fr))}
-.op-organo{font-size:.875rem;text-align:center;min-height:115px;padding:12px 8px;}
-.op-organo span{font-weight:400;font-size:.8rem;line-height:1.35}
-.marca{min-width:44px;min-height:44px;justify-content:center;}
-.marca-edificio{min-width:36px;min-height:36px;}
-.marca-activa:not([hidden]),.marca-filtrada:not([hidden]){display:flex!important}
-.marca-sigla,.marca-rotulo{font-size:12px}
-.ficha-plegar{border:0;background:none;color:var(--acento);font-size:.875rem;min-height:40px;cursor:pointer;padding:0 4px;margin-bottom:6px;}
-.ficha.plegada .ficha-datos,.ficha.plegada .ficha-acciones{display:none}
-.ctrl#btn-gps-apagar{font-size:11px}
-@media(max-width:600px){.mapa-busqueda{gap:6px}.buscar-mapa{flex-basis:100%}.accesos-rapidos{width:100%}.accesos-rapidos button{flex:1;padding:8px}.cabecera-sub{display:none}.estado-publicacion{font-size:.75rem}.ficha{max-height:55%}}
-@media(min-width:1000px){#vista-mapa:has(#lista-lugares:not([hidden])) #mapa-caja{display:block!important;flex:1}#vista-mapa:has(#lista-lugares:not([hidden])){padding-left:340px}#vista-mapa:has(#lista-lugares:not([hidden])) .lista-lugares{position:absolute;left:0;top:0;bottom:0;width:340px;border-right:1px solid var(--borde)}.ficha-plegar{display:none}}
-@media print{.estado-publicacion{display:none}}
-.organo-iniciales{width:100%;height:100%;display:grid;place-items:center;background:var(--navy);color:#fff;border-radius:50%;font-size:.65rem;font-weight:700;overflow:hidden;text-overflow:ellipsis}.op-organo>.organo-iniciales{width:34px;height:34px}.chip-perfil>.organo-iniciales{width:24px;height:24px}.organo-iniciales.ficha-logo{width:48px;height:48px;flex-shrink:0}.ed-place-icon .organo-iniciales{width:30px;height:30px}
+/* ------------------------------------------------- estado de la publicacion
+   De cuando son los datos que se estan viendo. Queda siempre a la vista: es la
+   forma mas rapida de saber que publicacion tiene cargada la app. */
+.estado-publicacion {
+  flex: 0 0 auto; padding: 5px 14px;
+  background: var(--papel-2); border-bottom: 1px solid var(--borde);
+  font-size: .76rem; color: var(--tinta-2);
+}
+.estado-publicacion[data-estado="offline"],
+.estado-publicacion[data-estado="sin-actualizar"] { color: var(--alerta); font-weight: 600; }
+.estado-publicacion[data-estado="preview"] { background: #3b1d5e; color: #fff; font-weight: 600; }
+@media (max-width: 600px) { .estado-publicacion { font-size: .72rem; } }
+@media print { .estado-publicacion { display: none; } }
+
+/* --------------------------------------------------- marcadores: zona tocable
+   La zona tocable llega a 44 px aunque el disco sea mas chico. El boton no
+   tiene fondo, asi que no cambia nada de lo que se ve. */
+.marca { min-width: var(--tap); min-height: var(--tap); justify-content: center; }
+.marca-edificio { min-width: 36px; min-height: 36px; }
+/* lo que se abrio o se filtro a proposito se ve aunque el zoom lo esconda */
+.marca-activa:not([hidden]), .marca-filtrada:not([hidden]) { display: flex !important; }
+
+/* organos creados en el editor, que todavia no tienen logo: van sus siglas */
+.organo-iniciales {
+  width: 100%; height: 100%; display: grid; place-items: center;
+  background: var(--navy); color: #fff; border-radius: 50%;
+  font-size: .65rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis;
+}
+.op-organo > .organo-iniciales { width: 34px; height: 34px; }
+.chip-perfil > .organo-iniciales { width: 22px; height: 22px; }
+.organo-iniciales.ficha-logo { width: 48px; height: 48px; flex-shrink: 0; }
+.ed-place-icon .organo-iniciales { width: 30px; height: 30px; }
+
+/* ------------------------------------------------------ ficha plegable
+   Una manija arriba, como las hojas que suben desde abajo en cualquier app:
+   se entiende sin leer y no le agrega una linea de texto a la ficha. */
+.ficha-plegar {
+  display: block; width: 64px; height: 20px; margin: -8px auto 2px; padding: 0;
+  border: 0; border-radius: 10px; background: none; cursor: pointer;
+}
+.ficha-plegar::before {
+  content: ""; display: block; width: 38px; height: 4px; margin: 0 auto;
+  border-radius: 2px; background: var(--borde);
+}
+.ficha-plegar:hover::before { background: var(--tinta-2); }
+.ficha.plegada .ficha-datos, .ficha.plegada .ficha-acciones { display: none; }
+@media (min-width: 780px) { .ficha-plegar { display: none; } }
+
+/* ------------------------------------------------------ apariencia (Info) */
+.segmentos {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+  margin-top: 10px; padding: 4px; border-radius: 12px; background: var(--papel-3);
+}
+.segmentos button {
+  min-height: 40px; padding: 4px 6px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: 0; border-radius: 9px; background: none; color: var(--tinta-2);
+  font-size: .84rem; font-weight: 600; cursor: pointer;
+}
+.segmentos svg { width: 16px; height: 16px; fill: currentColor; flex: 0 0 auto; }
+.segmentos button[aria-pressed="true"] { background: var(--papel); color: var(--tinta); box-shadow: var(--sombra-baja); }
+.tarjeta .nota-resultado { margin-top: 8px; font-size: .84rem; }
+.tarjeta .nota-resultado:empty { display: none; }
+
+/* --------------------------------------- escritorio: la lista al lado del mapa
+   En pantalla grande sobra lugar para no tener que elegir entre lista y mapa. */
+@media (min-width: 1000px) {
+  #vista-mapa:has(#lista-lugares:not([hidden])) { padding-left: 340px; }
+  #vista-mapa:has(#lista-lugares:not([hidden])) #mapa-caja { display: block !important; flex: 1; }
+  #vista-mapa:has(#lista-lugares:not([hidden])) .lista-lugares {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 340px;
+    border-right: 1px solid var(--borde);
+  }
+}
+
+@media (max-width: 600px) { .ficha { max-height: 55%; } }

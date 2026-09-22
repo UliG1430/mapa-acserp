@@ -12,6 +12,7 @@ import * as cron from './cronograma.js';
 import { buscar, sugerencias } from './buscador.js';
 import { obtenerPerfil, guardarPerfil, alCambiarPerfil, miOrgano, miTrack }
   from './perfil.js';
+import { temaActual, setTema, alCambiarTema } from './tema.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -68,9 +69,7 @@ function iniciarMapa() {
   });
 
   const cont = $('#filtros');
-  cont.innerHTML = GRUPOS.map((g) =>
-    `<button type="button" class="filtro" data-g="${g.id}" aria-pressed="true">${esc(g.etiqueta)}</button>`
-  ).join('');
+  pintarFiltros();
   cont.addEventListener('click', (e) => {
     const b = e.target.closest('.filtro');
     if (!b) return;
@@ -93,9 +92,30 @@ function iniciarMapa() {
   $('#btn-ver-mapa').addEventListener('click', () => verComo('mapa'));
   $('#btn-ver-lista').addEventListener('click', () => verComo('lista'));
 
-  // si ya hay perfil, arrancamos mirando la sede propia
+  // si ya hay perfil, arrancamos mirando la sede propia y con el resto de las
+  // sedes apagadas: quince discos con logo tapan el dibujo y ninguno es el tuyo
   const sede = miOrgano();
+  mapa.setSoloOrgano(sede ? sede.sigla : null);
   if (sede) setTimeout(() => mapa.centrarEn('org-' + sede.sigla.toLowerCase()), 350);
+}
+
+/**
+ * Los filtros de arriba. Se vuelven a dibujar cuando cambia el perfil porque el
+ * de sedes cambia de nombre: con un organo elegido ya no muestra "Órganos" sino
+ * el tuyo solo, y decirle "Órganos" a un boton que prende una sola sede miente.
+ * Lo que estaba prendido se conserva.
+ */
+function pintarFiltros() {
+  const cont = $('#filtros');
+  const previos = $$('.filtro').map((b) => b.dataset.g);
+  const encendidos = new Set($$('.filtro[aria-pressed="true"]').map((b) => b.dataset.g));
+  const propio = !!miOrgano();
+  cont.innerHTML = GRUPOS.map((g) => {
+    // la primera vez no hay nada dibujado todavia: arrancan todos prendidos
+    const on = previos.includes(g.id) ? encendidos.has(g.id) : true;
+    const etiqueta = g.id === 'sede' && propio ? 'Mi órgano' : g.etiqueta;
+    return `<button type="button" class="filtro" data-g="${g.id}" aria-pressed="${on}">${esc(etiqueta)}</button>`;
+  }).join('');
 }
 
 /**
@@ -121,11 +141,25 @@ function verComo(cual) {
 }
 
 // ---------------------------------------------------------------- ubicacion
+//
+// Un solo boton: prende y apaga. Y la app la pide sola, porque saber donde
+// estas es lo primero que se necesita en un predio de un kilometro de lado.
+const CLAVE_GPS = 'minulp2026.ubicacionPedida';
+
+function apagarGps() {
+  if (pararGps) pararGps();
+  pararGps = null;
+  estadoGps = 'apagado';
+  mapa.setUbicacion(null);
+  $('#btn-ubicar').dataset.estado = '';
+  $('#btn-ubicar').classList.remove('ctrl-late');
+  avisar(null);
+}
+
 function alternarGps() {
-  if (pararGps) { mapa.irAMiUbicacion(); return; }
+  if (pararGps) { apagarGps(); return; }
   let apagado = false;
   estadoGps = 'buscando';
-  $('#btn-gps-apagar').hidden=false;
   $('#btn-ubicar').dataset.estado = 'buscando';
   avisar('Buscando tu ubicación…');
   const parar = geo.seguirUbicacion(
@@ -159,7 +193,6 @@ function alternarGps() {
       // asi que lo apagamos: si no, cada toque al boton dejaba otro GPS prendido.
       if (err === 'demora') return;
       estadoGps = 'error';
-      $('#btn-gps-apagar').hidden=true;
       $('#btn-ubicar').dataset.estado = '';
       if (pararGps) pararGps();
       pararGps = null;
@@ -170,7 +203,31 @@ function alternarGps() {
   if (apagado) parar(); else pararGps = parar;
 }
 
-$('#btn-gps-apagar').addEventListener('click',()=>{pararGps?.();pararGps=null;estadoGps='apagado';mapa.setUbicacion(null);$('#btn-ubicar').dataset.estado='';$('#btn-gps-apagar').hidden=true;avisar(null);});
+/**
+ * Prende la ubicacion sola, sin que haya que buscar el boton.
+ *
+ * Si el permiso ya estaba dado, arranca sin preguntar nada. Si nunca se
+ * decidio, el navegador pregunta una sola vez por dispositivo: insistir en cada
+ * visita a quien dijo que no es molestar. Si lo rechazo, no se vuelve a pedir y
+ * queda el boton para cuando quiera.
+ */
+async function ubicacionAutomatica() {
+  try {
+    if (pararGps || !('geolocation' in navigator)) return;
+    let permiso = null;
+    try {
+      permiso = (await navigator.permissions.query({ name: 'geolocation' })).state;
+    } catch (e) { /* Safari viejo no tiene permissions.query: se pregunta igual */ }
+    if (permiso === 'denied') return;
+    if (permiso !== 'granted') {
+      try {
+        if (localStorage.getItem(CLAVE_GPS)) return;
+        localStorage.setItem(CLAVE_GPS, '1');
+      } catch (e) { /* sin storage: se pregunta una vez por visita */ }
+    }
+    alternarGps();
+  } catch (e) { /* si el navegador no coopera, queda el boton de siempre */ }
+}
 
 function avisar(txt) {
   const el = $('#aviso-gps');
@@ -235,8 +292,13 @@ function pintarFicha(p, u) {
     datos.push(`<div class="dato"><dt>Ahora acá</dt><dd>${esc(ahora || 'Sin actividad')}</dd></div>`);
   }
 
+  // Se repinta cada 30 s para refrescar "ahora acá": si era el mismo punto y
+  // estaba plegada, tiene que seguir plegada y no abrirse sola.
+  const plegada = f.classList.contains('plegada') && f.dataset.id === p.id;
+  f.dataset.id = p.id;
   f.innerHTML = `
-    <button type="button" class="ficha-plegar" aria-expanded="true">Reducir ficha</button>
+    <button type="button" class="ficha-plegar" aria-expanded="${!plegada}"
+      aria-label="${plegada ? 'Ampliar la ficha' : 'Reducir la ficha'}"></button>
     <button type="button" class="ficha-cerrar" aria-label="Cerrar">&times;</button>
     <div class="ficha-cab">${cabecera}</div>
     ${datos.length ? `<dl class="ficha-datos">${datos.join('')}</dl>` : ''}
@@ -245,8 +307,12 @@ function pintarFicha(p, u) {
       ${!d ? '<button type="button" class="btn-sec" data-ir="ubicar">¿A qué distancia estoy?</button>' : ''}
     </div>`;
   f.hidden = false;
-  f.classList.remove('plegada');
-  f.querySelector('.ficha-plegar').onclick=e=>{const on=f.classList.toggle('plegada');e.target.setAttribute('aria-expanded',String(!on));e.target.textContent=on?'Ampliar ficha':'Reducir ficha';};
+  f.classList.toggle('plegada', plegada);
+  f.querySelector('.ficha-plegar').onclick = (e) => {
+    const on = f.classList.toggle('plegada');
+    e.currentTarget.setAttribute('aria-expanded', String(!on));
+    e.currentTarget.setAttribute('aria-label', on ? 'Ampliar la ficha' : 'Reducir la ficha');
+  };
   // la ficha tapa parte del mapa: corremos la vista si el punto quedo abajo
   requestAnimationFrame(() => {
     const fr = f.getBoundingClientRect();
@@ -484,7 +550,7 @@ function pintarInfo() {
   } else {
     partes.push(`<div class="tarjeta">
       <h2>Estás viendo todo el modelo</h2>
-      <p>Si elegís tu órgano, el cronograma te muestra solo lo tuyo y el mapa te marca tu sede.
+      <p>Si elegís tu órgano, el cronograma te muestra solo lo tuyo y el mapa marca solo tu sede.
       No es obligatorio: así como está funciona igual.</p>
       <div class="ficha-acciones"><button type="button" class="btn-pri" id="info-cambiar">Elegir mi órgano</button></div>
     </div>`);
@@ -553,10 +619,21 @@ function pintarInfo() {
 
   partes.push(`<h2 class="lista-grupo">La app</h2>
     <div class="tarjeta">
+      <h2>Apariencia</h2>
+      <p>Automático sigue el modo de tu teléfono y cambia solo cuando cambia el suyo.</p>
+      <div class="segmentos" role="group" aria-label="Colores de la app">
+        ${OPCIONES_TEMA.map((t) => `<button type="button" data-tema="${t.id}"
+          aria-pressed="${temaActual() === t.id}"><svg viewBox="0 0 24 24" aria-hidden="true">${t.icono}</svg>${t.etiqueta}</button>`).join('')}
+      </div>
+    </div>
+    <div class="tarjeta">
       <h2>Guardala en tu celular</h2>
-      <button type="button" class="btn-sec" id="preparar-offline">Descargar para usar sin conexión</button><p id="offline-resultado" role="status"></p>
       <p>Desde el menú del navegador elegí <b>“Agregar a pantalla de inicio”</b> (en iPhone está dentro del botón de compartir).
       Así se abre como una app y sigue funcionando aunque te quedes sin señal en el predio.</p>
+      <div class="ficha-acciones">
+        <button type="button" class="btn-sec" id="preparar-offline">Descargar para usar sin conexión</button>
+      </div>
+      <p class="nota-resultado" id="offline-resultado" role="status"></p>
     </div>
     <div class="tarjeta">
       <h2>Sobre la ubicación</h2>
@@ -575,7 +652,22 @@ function pintarInfo() {
 
   $('#info-contenido').innerHTML = partes.join('');
 
-  $('#preparar-offline').onclick=async e=>{e.target.disabled=true;$('#offline-resultado').textContent='Descargando mapa…';try{await prepararOffline();$('#offline-resultado').textContent='Listo. El mapa está disponible sin conexión.';}catch(err){$('#offline-resultado').textContent=err.message;}finally{e.target.disabled=false;}};
+  $('#preparar-offline').onclick = async (e) => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    $('#offline-resultado').textContent = 'Descargando el mapa…';
+    try {
+      await prepararOffline();
+      $('#offline-resultado').textContent = 'Listo. El mapa está disponible sin conexión.';
+    } catch (err) {
+      $('#offline-resultado').textContent = err.message;
+    } finally {
+      b.disabled = false;
+    }
+  };
+  $$('#info-contenido [data-tema]').forEach((b) => {
+    b.onclick = () => setTema(b.dataset.tema);
+  });
   const verSede = $('#info-ver-sede');
   if (verSede) verSede.addEventListener('click', () => {
     verEnElMapa('org-' + o.sigla.toLowerCase());
@@ -597,21 +689,25 @@ function pintarInfo() {
 let elegido = { organo: null };
 
 function abrirPerfil() {
-  $('#modal-perfil').returnValue='';
+  const modal = $('#modal-perfil');
+  modal.returnValue = '';
   elegido = { ...obtenerPerfil() };
   const actual = miOrgano();
   $('#modal-perfil-ayuda').innerHTML = actual
-    ? `Ahora estás viendo lo de <b>${esc(actual.sigla)}</b>. Tocá otro órgano para cambiarlo,
-       o <b>Ver todo</b> para ver el modelo completo.`
-    : `Sirve para mostrarte tu sede en el mapa y filtrar el cronograma.
-       Se puede modificar cuando quieras.`;
+    ? `Ahora estás viendo lo de <b>${esc(actual.sigla)}</b>, y el mapa marca solo su sede.
+       Tocá otro órgano para cambiarlo, o <b>Ver todo</b> para quedarte sin órgano y ver
+       el modelo completo.`
+    : `Sirve para marcar sólo tu sede en el mapa y filtrar el cronograma.
+       Podés seguir sin elegir nada y ver todo completo; se cambia cuando quieras.`;
   $('#grilla-organos').innerHTML = ORGANOS.map((o) => `
     <button type="button" class="op-organo" data-sigla="${esc(o.sigla)}"
-      aria-pressed="${elegido.organo === o.sigla}">
+      aria-pressed="${elegido.organo === o.sigla}" aria-label="${esc(o.sigla)}, ${esc(o.nombre)}">
       ${logoOrgano(o.sigla)}
-      <b>${esc(o.sigla)}</b><span>${esc(o.nombre)}</span>
+      ${esc(o.sigla)}
+      <small>${esc(o.nombre)}</small>
     </button>`).join('');
-  $('#modal-perfil').showModal();
+  // abrirlo dos veces tira error: pasa si se toca el chip con el cartel ya abierto
+  if (!modal.open) modal.showModal();
 }
 
 $('#grilla-organos').addEventListener('click', (e) => {
@@ -623,10 +719,16 @@ $('#grilla-organos').addEventListener('click', (e) => {
 });
 $('#form-perfil').addEventListener('submit', (e) => {
   const salida = e.submitter ? e.submitter.value : 'guardar';
+  // "Ver todo" es elegir no tener organo: si habia uno, se limpia y el mapa
+  // vuelve a marcar las quince sedes.
   const organo = salida === 'omitir' ? null : elegido.organo;
   guardarPerfil({ organo });
   if (organo && mapa) verEnElMapa('org-' + organo.toLowerCase(), 120);
+  // recien ahora se pide la ubicacion: dos ventanas del navegador encimadas
+  // (el cartel y el permiso) no se entienden
+  setTimeout(ubicacionAutomatica, 500);
 });
+$('#modal-perfil').addEventListener('close', () => setTimeout(ubicacionAutomatica, 500));
 
 $('#btn-perfil').addEventListener('click', abrirPerfil);
 
@@ -638,16 +740,75 @@ function pintarChip() {
                     <span>${esc(o.sigla)}</span>`;
     el.setAttribute('aria-label', `Tu órgano: ${o.sigla}. Tocá para cambiarlo.`);
   } else {
-    el.innerHTML = '<span>Elegí tu órgano</span>';
+    el.innerHTML = '<span>Tu órgano</span>';
     el.setAttribute('aria-label', 'Elegir tu órgano');
   }
 }
-alCambiarPerfil(() => {
-  organoConsulta=null;
+alCambiarPerfil((p) => {
+  organoConsulta = null;
   pintarChip();
+  if (mapa) {
+    mapa.setSoloOrgano(p.organo);
+    pintarFiltros();
+  }
   if (!$('#vista-cronograma').hidden) pintarCronograma();
   if (!$('#vista-info').hidden) pintarInfo();
 });
+
+// ===========================================================================
+//  TEMA
+//  Tres modos, no dos: automatico (el del telefono) es el de fabrica, y hay
+//  que poder volver a el despues de haber elegido a mano. Vive en Info porque
+//  es algo que se decide una vez, y un icono en la cabecera que cicla tres
+//  estados obliga a adivinar en cual estas.
+// ===========================================================================
+const OPCIONES_TEMA = [
+  { id: 'auto', etiqueta: 'Automático',
+    icono: '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16Z"/>'
+         + '<path d="M12 5.6a6.4 6.4 0 0 1 0 12.8Z"/>' },
+  { id: 'claro', etiqueta: 'Claro',
+    icono: '<circle cx="12" cy="12" r="4.2"/><path fill="none" stroke="currentColor" stroke-width="2"'
+         + ' stroke-linecap="round" d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6'
+         + 'M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/>' },
+  { id: 'oscuro', etiqueta: 'Oscuro',
+    icono: '<path d="M12 3a9 9 0 1 0 9 9A7 7 0 0 1 12 3Z"/>' },
+];
+
+alCambiarTema((modo) => {
+  $$('#info-contenido [data-tema]').forEach((b) =>
+    b.setAttribute('aria-pressed', String(b.dataset.tema === modo)));
+});
+
+// ===========================================================================
+//  PORTADA
+//  La animacion la maneja js/portada.js por su cuenta (ver por que ahi). La app
+//  solo le avisa cuando esta lista, y espera a que se vaya para abrir el cartel.
+// ===========================================================================
+function avisarQueEstaLista() {
+  const fondo = $('#mapa-fondo');
+  let avisado = false;
+  const avisar = () => {
+    if (avisado) return;
+    avisado = true;
+    window.__minulpLista = true;
+    window.dispatchEvent(new Event('minulp:lista'));
+  };
+  // el dibujo del predio es lo que se ve apenas se va la portada: si todavia no
+  // bajo, se espera un poco para no destapar un recuadro vacio. Con tope.
+  if (!fondo || (fondo.complete && fondo.naturalWidth)) { avisar(); return; }
+  fondo.addEventListener('load', avisar, { once: true });
+  fondo.addEventListener('error', avisar, { once: true });
+  setTimeout(avisar, 1500);
+}
+
+function cuandoTermineLaPortada(fn) {
+  const portada = $('#portada');
+  // Si portada.js no corrio (lo bloqueo algo, no bajo) la portada quedaria
+  // tapando todo para siempre. La app la saca y sigue.
+  if (portada && !window.__minulpPortada) portada.hidden = true;
+  if (!portada || portada.hidden || window.__minulpPortadaFuera) { fn(); return; }
+  window.addEventListener('minulp:portada-fuera', fn, { once: true });
+}
 
 // ===========================================================================
 //  ARRANQUE
@@ -661,17 +822,23 @@ verComo('mapa');
 const vistaInicial = (location.hash || '').replace('#', '');
 irA(['mapa', 'cronograma', 'buscar', 'info'].includes(vistaInicial) ? vistaInicial : 'mapa', false);
 
-// La elección de órgano es opcional y no interrumpe el acceso al mapa.
-$('#buscar-en-mapa').onclick=()=>irA('buscar');
-$('#mi-sede').onclick=()=>{const o=miOrgano();if(o)verEnElMapa('org-'+o.sigla.toLowerCase());else abrirPerfil();};
-$$('[data-busqueda]').forEach(b=>b.onclick=()=>{irA('buscar');$('#q').value=b.dataset.busqueda;pintarResultados(b.dataset.busqueda);});
+avisarQueEstaLista();
+
+// Sin organo elegido, la app pregunta en cada visita: elegirlo es lo que hace
+// que el cronograma y el mapa muestren lo tuyo. Una vez elegido queda guardado
+// y no vuelve a molestar. El cartel espera a que la portada termine: no puede
+// taparle a nadie la animacion de entrada. Si ya hay organo, lo unico que se
+// pide es la ubicacion.
+cuandoTermineLaPortada(() => {
+  if (!obtenerPerfil().organo) setTimeout(abrirPerfil, 260);
+  else setTimeout(ubicacionAutomatica, 400);
+});
+
 let revisionVista=publicacion.revision;
 alCambiarDatos(()=>{
   if(revisionVista===publicacion.revision)return;
   revisionVista=publicacion.revision;
-  const seleccion=mapa.seleccionActual();
   mapa.setDatos(obtenerDatos());
-  if(seleccion&&!mapa.seleccionActual())avisar('El lugar seleccionado ya no está en la publicación actual.');
   pintarChip();pintarAtajos();pintarResultados($('#q').value);
   if(!$('#lista-lugares').hidden)pintarLista();
   if(!$('#vista-cronograma').hidden)pintarCronograma();
@@ -693,9 +860,9 @@ if ('serviceWorker' in navigator && ES_DESARROLLO) {
     .then(() => (self.caches ? caches.keys().then((ks) => Promise.all(ks.filter(k=>k.startsWith('minulp-')).map((k) => caches.delete(k)))) : null))
     .catch(() => {});
 } else if ('serviceWorker' in navigator) {
-  // Si ya habia una version corriendo y entra a mandar una nueva, recargamos
-  // una sola vez para quedar con todo de la misma version. Solo si la pagina
-  // recien se abrio: recargarle la app a alguien que la esta usando, no.
+  // Si entra a mandar una version nueva, no se recarga la pagina: se avisa. Una
+  // recarga en medio del arranque reiniciaba la portada y parecia un cuelgue,
+  // y a quien ya la esta usando no se le cambia la app en la mano.
   const yaHabia = !!navigator.serviceWorker.controller;
   let recargando = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
