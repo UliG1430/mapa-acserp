@@ -265,7 +265,7 @@ import {urlSegura} from './seguridad.js';
       acomodarColumnas();
 
       $('#pie').innerHTML =
-        `<b>Diseñado y desarrollado por ${esc(CREDITOS.usuario)} para ${esc(CREDITOS.para)}.</b><br>` +
+        `<b>Diseñado y desarrollado por ${esc(String(CREDITOS.usuario).replace(/^@/, ''))} para ${esc(CREDITOS.para)}.</b><br>` +
         'Ilustración del predio: República de los Niños, Municipalidad de La Plata. ' +
         'Calles del entorno: © colaboradores de OpenStreetMap.';
 
@@ -326,6 +326,9 @@ import {urlSegura} from './seguridad.js';
       if (!natural || !disponible) return;
       const k = Math.min(1, disponible / natural);
       $('#escala').style.transform = `scale(${k})`;
+      // la caja tiene que medir lo que se ve, no lo que mide la hoja sin
+      // escalar: asi se puede centrar, y en pantallas angostas no se va afuera
+      $('#escala').style.width = (natural * k) + 'px';
       $('#escala').style.height = ($('#hoja').offsetHeight * k) + 'px';
     }
     addEventListener('resize', encajar);

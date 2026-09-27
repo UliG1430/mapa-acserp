@@ -31,6 +31,16 @@ Mover un órgano modifica solo ese órgano. Mover un edificio puede modificar ta
 
 El acceso público no necesita cuenta. Sin conexión conserva la última publicación válida descargada; muestra su estado y no puede recibir novedades hasta reconectarse.
 
+## Interfaz pública
+
+- **Sin scripts en línea.** El servidor manda `Content-Security-Policy: script-src 'self'`, que bloquea cualquier `<script>` escrito dentro del HTML. Todo va en archivos de `js/`. Un script en línea no da error visible: simplemente no corre.
+- **Portada** (`js/portada.js`). Corre sola, sin esperar a la app: `datos.js` frena al resto de los módulos hasta tener los datos, y en una primera visita con mala señal eso dejaba la animación congelada. Se va cuando el logo terminó de dibujarse *y* la app avisó que está lista (evento `minulp:lista`). Si la app tarda, dice "Cargando el mapa…"; a los 12 s se va igual. Si el archivo no llegara a correr, `app.js` la saca por su cuenta.
+- **Tema** (`js/tema-inicial.js` + `js/tema.js`). Automático, claro u oscuro, elegido en Info → Apariencia. `tema-inicial.js` va en el `<head>` de las cuatro páginas, sin `defer`, para decidir la paleta antes de pintar. La paleta oscura vive una sola vez en `css/app.css`, colgada de `data-tema="oscuro"`.
+- **Órgano propio.** Sin órgano elegido, el cartel pregunta en cada visita, después de la portada; con uno elegido queda guardado y no vuelve a aparecer. El mapa marca solo esa sede y el filtro pasa a decir "Mi órgano"; "Ver todo" borra el órgano y vuelven las quince.
+- **Ubicación.** Un solo botón prende y apaga. La app la pide sola: si el permiso ya estaba dado arranca sin preguntar, si nunca se decidió pregunta una vez por dispositivo (después del cartel, para no encimar dos ventanas del navegador) y si se rechazó no vuelve a insistir.
+- **Búsqueda** en su pestaña, no arriba del mapa: los accesos rápidos repetían "Baños" y "Comida", que ya son filtros, y le quitaban unos 140 px de alto al mapa en el celular.
+- **Franja de estado.** Debajo de la cabecera dice de cuándo son los datos cargados y si se pudo comprobar si hay novedades. Se deja siempre visible: es la forma más rápida de saber, desde cualquier teléfono, qué publicación está usando la app.
+
 ## Verificación
 
 ```sh

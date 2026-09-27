@@ -2,7 +2,7 @@
 // es inmutable: una página abierta nunca mezcla archivos de distintas versiones.
 const VERSION='minulp-shell-BUILD_ID';
 const OPTIONAL_CACHE=VERSION+'-opcional';
-const SHELL=['./','index.html','manifest.webmanifest','css/app.css','css/marcas.css','css/fuente.css','fonts/montserrat-latin.woff2','js/app.js','js/datos.js','js/validacion.js','js/seguridad.js','js/organos.js','js/estado-publico.js','js/mapa.js','js/geo.js','js/cronograma.js','js/buscador.js','js/perfil.js','data/inicial.json','img/mapa.webp','img/entorno.svg','img/icons/icon-192.png','img/logos/MINULP-BLANCO.webp',...['AG','STI','CS','ECOSOC','CDH','ONUM','PNUMA','UNESCO','ACNUR','UNICEF','OMS','CAJ','OIT','ONUDD','UNODA'].map(s=>'img/logos/'+s+'.webp')];
+const SHELL=['./','index.html','manifest.webmanifest','css/app.css','css/marcas.css','css/fuente.css','fonts/montserrat-latin.woff2','js/tema-inicial.js','js/portada.js','js/tema.js','js/app.js','js/datos.js','js/validacion.js','js/seguridad.js','js/organos.js','js/estado-publico.js','js/mapa.js','js/geo.js','js/cronograma.js','js/buscador.js','js/perfil.js','data/inicial.json','img/splash.webp','img/splash-fijo.webp','img/mapa.webp','img/entorno.svg','img/icons/icon-192.png','img/logos/MINULP-BLANCO.webp',...['AG','STI','CS','ECOSOC','CDH','ONUM','PNUMA','UNESCO','ACNUR','UNICEF','OMS','CAJ','OIT','ONUDD','UNODA'].map(s=>'img/logos/'+s+'.webp')];
 const OPTIONAL=['img/mapa@2x.webp','img/oficial.webp','imprimir.html','css/imprimir.css','js/imprimir.js','js/qr.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(SHELL)));});
 // Sin skipWaiting/claim: activar cuando ya no haya páginas de la versión previa.
